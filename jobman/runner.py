@@ -6,12 +6,11 @@ import inspect
 import shutil
 import optparse
 from optparse import OptionParser
+from .tools import DD, expand, format_help, resolve, UsageError
+from .channel import StandardChannel
 
-from tools import DD, expand, format_help, resolve, UsageError
-from channel import StandardChannel
-
-import parse
-import workdirgen
+from . import parse
+from . import workdirgen
 
 ################################################################################
 ### Running
@@ -63,9 +62,9 @@ def run_cmdline():
                 cmd = arg
         warn_if_sql_failure()
         return parse_and_run(cmd, args)
-    except UsageError, e:
-        print 'Usage error:'
-        print e
+    except UsageError as e:
+        print('Usage error:')
+        print(e)
 
 
 def warn_if_sql_failure():
@@ -82,8 +81,8 @@ def warn_if_sql_failure():
             # Note: we use `RuntimeWarning` instead of `ImportWarning` because
             # the latter are ignored by default, and we do not want it to be
             # ignored.
-            print ("WARNING: SQL-related module '%s' could not be imported: SQL"
-                   " features will most likely crash" % module)
+            print(("WARNING: SQL-related module '%s' could not be imported: SQL"
+                   " features will most likely crash" % module))
 
 
 ################################################################################
@@ -184,7 +183,7 @@ def runner_cmdline(options, experiment, *strings):
         workdir_gen = getattr(workdirgen, options.workdir_gen,
                               None) or resolve(options.workdir_gen)
         workdir = workdir_gen(state)
-    print "The working directory is:", os.path.join(os.getcwd(), workdir)
+    print("The working directory is:", os.path.join(os.getcwd(), workdir))
 
     channel = StandardChannel(workdir,
                               experiment, state,
@@ -286,14 +285,14 @@ def runner_help(options, topic=None):
     def bold(x):
         return '\033[1m%s\033[0m' % x
     if topic is None:
-        print bold('Topics: (use help <topic> for more info)')
-        print 'example        Example of defining and running an experiment.'
-        print 'experiment     How to define an experiment.'
-        print 'parameters     How to list the parameters for an experiment.'
-        print
-        print bold('Available commands: (use help <command> for more info)')
-        for name, (parser, command) in sorted(runner_registry.iteritems()):
-            print name.ljust(20), format_help(command).split('\n')[0]
+        print(bold('Topics: (use help <topic> for more info)'))
+        print('example        Example of defining and running an experiment.')
+        print('experiment     How to define an experiment.')
+        print('parameters     How to list the parameters for an experiment.')
+        print()
+        print(bold('Available commands: (use help <command> for more info)'))
+        for name, (parser, command) in sorted(runner_registry.items()):
+            print(name.ljust(20), format_help(command).split('\n')[0])
         return
     elif topic == 'experiment':
         helptext = """
@@ -460,7 +459,7 @@ def runner_help(options, topic=None):
         helptext = runner_registry.get(topic, (None, None))[1]
         if helptext is None:
             return runner_help(options, topic=None)
-    print format_help(helptext)
+    print(format_help(helptext))
     if runner_registry.get(topic, [None])[0]:
         runner_registry.get(topic, [None])[0].print_help()
 

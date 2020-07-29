@@ -24,7 +24,7 @@ TODO: recommended preprocessing, lr ranges, regularization ranges (explain
 __docformat__ = 'restructedtext en'
 
 
-import numpy, cPickle, gzip
+import numpy, pickle, gzip
 
 
 import theano
@@ -172,7 +172,7 @@ def sgd_optimization_mnist( learning_rate=0.01, n_hidden=500, L1_reg = 0.00, \
 
     # Load the dataset 
     f = gzip.open('/u/lisa/HTML/deep/data/mnist/mnist.pkl.gz','rb')
-    train_set, valid_set, test_set = cPickle.load(f)
+    train_set, valid_set, test_set = pickle.load(f)
     f.close()
 
     # make minibatches of size 20 
@@ -183,7 +183,7 @@ def sgd_optimization_mnist( learning_rate=0.01, n_hidden=500, L1_reg = 0.00, \
     (train_set_x, train_set_y) = train_set
     # initialize the list of training minibatches with empty list
     train_batches = []
-    for i in xrange(0, len(train_set_x), batch_size):
+    for i in range(0, len(train_set_x), batch_size):
         # add to the list of minibatches the minibatch starting at 
         # position i, ending at position i+batch_size
         # a minibatch is a pair ; the first element of the pair is a list 
@@ -196,7 +196,7 @@ def sgd_optimization_mnist( learning_rate=0.01, n_hidden=500, L1_reg = 0.00, \
     (valid_set_x, valid_set_y) = valid_set
     # initialize the list of validation minibatches 
     valid_batches = []
-    for i in xrange(0, len(valid_set_x), batch_size):
+    for i in range(0, len(valid_set_x), batch_size):
         valid_batches = valid_batches + \
                [(valid_set_x[i:i+batch_size], valid_set_y[i:i+batch_size])]
 
@@ -204,7 +204,7 @@ def sgd_optimization_mnist( learning_rate=0.01, n_hidden=500, L1_reg = 0.00, \
     (test_set_x, test_set_y) = test_set
     # initialize the list of testing minibatches 
     test_batches = []
-    for i in xrange(0, len(test_set_x), batch_size):
+    for i in range(0, len(test_set_x), batch_size):
         test_batches = test_batches + \
               [(test_set_x[i:i+batch_size], test_set_y[i:i+batch_size])]
 
@@ -268,7 +268,7 @@ def sgd_optimization_mnist( learning_rate=0.01, n_hidden=500, L1_reg = 0.00, \
     test_score           = 0.
     start_time = time.clock()
     # have a maximum of `n_iter` iterations through the entire dataset
-    for iter in xrange(n_iter* n_minibatches):
+    for iter in range(n_iter* n_minibatches):
 
         # get epoch and minibatch index
         epoch           = iter / n_minibatches
@@ -288,9 +288,9 @@ def sgd_optimization_mnist( learning_rate=0.01, n_hidden=500, L1_reg = 0.00, \
             # get the average by dividing with the number of minibatches
             this_validation_loss /= len(valid_batches)
 
-            print('epoch %i, minibatch %i/%i, validation error %f %%' % \
+            print(('epoch %i, minibatch %i/%i, validation error %f %%' % \
                    (epoch, minibatch_index+1, n_minibatches, \
-                    this_validation_loss*100.))
+                    this_validation_loss*100.)))
 
 
             # if we got the best validation score until now
@@ -309,19 +309,19 @@ def sgd_optimization_mnist( learning_rate=0.01, n_hidden=500, L1_reg = 0.00, \
                 for x,y in test_batches:
                     test_score += test_model(x,y)
                 test_score /= len(test_batches)
-                print(('     epoch %i, minibatch %i/%i, test error of best '
+                print((('     epoch %i, minibatch %i/%i, test error of best '
                       'model %f %%') % 
                              (epoch, minibatch_index+1, n_minibatches,
-                              test_score*100.))
+                              test_score*100.)))
 
         if patience <= iter :
                 break
 
     end_time = time.clock()
-    print(('Optimization complete with best validation score of %f %%,'
+    print((('Optimization complete with best validation score of %f %%,'
            'with test performance %f %%') %  
-                 (best_validation_loss * 100., test_score*100.))
-    print ('The code ran for %f minutes' % ((end_time-start_time)/60.))
+                 (best_validation_loss * 100., test_score*100.)))
+    print(('The code ran for %f minutes' % ((end_time-start_time)/60.)))
 
     return (best_validation_loss, test_score, (end_time-start_time)/60, best_iter)
 

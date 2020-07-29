@@ -3,7 +3,6 @@ import logging
 
 from jobman.runner import runner_registry
 from optparse import OptionParser
-
 _logger = logging.getLogger('jobman.analyze_runner')
 
 parser_analyze = OptionParser(usage = '%prog rsync_any [options] <tablepath> <exproot>',
@@ -90,8 +89,8 @@ def cmd_desc(desc):
 
 def help(**kwargs):
     """Print help for this program"""
-    print "Usage: jobman analyze <cmd>"
+    print("Usage: jobman analyze <cmd>")
     #TODO
-    print "Commands available:"
-    for name, cmd in cmd_dct.iteritems():
-        print "%20s - %s"%(name, cmd.desc)
+    print("Commands available:")
+    for name, cmd in cmd_dct.items():
+        print("%20s - %s"%(name, cmd.desc))

@@ -23,7 +23,7 @@ try:
 except ImportError:
     numpy = None
 
-from tools import UsageError, reval
+from .tools import UsageError, reval
 
 
 def _convert(obj):
@@ -65,10 +65,10 @@ def filemerge(*strings, **kwargs):
         if '=' in s or '::' in s:
             d = lineparser(s)
             if prefix:
-                d = dict(('%s.%s' % (prefix, k), v) for k, v in d.iteritems())
+                d = dict(('%s.%s' % (prefix, k), v) for k, v in d.items())
             state.update(d)
         elif '<-' in s:
-            next_prefix, s = map(str.strip, s.split('<-', 1))
+            next_prefix, s = list(map(str.strip, s.split('<-', 1)))
             param = '%s.%s' % (prefix, next_prefix)
             if not prefix:
                 param = next_prefix
@@ -76,7 +76,7 @@ def filemerge(*strings, **kwargs):
         else:
             if cwd:
                 s = os.path.realpath(os.path.join(cwd, s))
-            f_data = map(str.strip, open(s).readlines())
+            f_data = list(map(str.strip, open(s).readlines()))
             lines = [_comment_pattern.sub('', x) for x in f_data]
             for line in lines:
                 if line:

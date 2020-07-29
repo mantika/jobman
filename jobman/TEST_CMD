@@ -1,10 +1,12 @@
 # This is some test command to execute manually
 # Those tests commands don't cover everything.
 exit
-SERVER="TO_FILL"
+PASSWORD=""
 
-DB_NAME=TEST_JOBMAN2
-P="postgres://$USER@${SERVER}/${USER}_db/${DB_NAME}"
+SERVER="localhost:5432"
+DB_NAME="TEST_JOBMAN2"
+TABLE="TEST_JOBMAN2"
+P="postgres://$USER:${PASSWORD}@${SERVER}/${DB_NAME}/${TABLE}"
 EXPDIR=/tmp/TEST_JOBMAN_EXP
 
 

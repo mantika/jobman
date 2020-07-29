@@ -1,12 +1,6 @@
 """ WRITEME """
-from __future__ import with_statement
 
-try:
-    import sql
-    from cachesync_runner import cachesync_lock
-    import cachesync_runner
-except:
-    pass
+from . import cachesync_runner
 
 import os
 import tempfile
@@ -17,13 +11,13 @@ import time
 import random
 import re
 from optparse import OptionParser
-
-from tools import expand, flatten, resolve, UsageError
-from runner import runner_registry
-from channel import StandardChannel, JobError
-import parse
-from sql import START, RUNNING, DONE, ERR_START, ERR_SYNC, ERR_RUN, CANCELED
-from api0 import open_db
+from .tools import expand, flatten, resolve, UsageError
+from .runner import runner_registry
+from .channel import StandardChannel, JobError
+from . import parse
+from .sql import START, RUNNING, DONE, ERR_START, ERR_SYNC, ERR_RUN, CANCELED
+from . import sql
+from .api0 import open_db
 
 
 ###############################################################################
@@ -86,7 +80,7 @@ class RSyncChannel(StandardChannel):
         keep_trying = True
         rsync_rval = 1  # some non-null value
 
-        with cachesync_lock(None, self.path):
+        with cachesync_runner.cachesync_lock(None, self.path):
             # Useful for manual tests; leave this there, just commented.
             #cachesync_runner.manualtest_will_save()
 
@@ -101,9 +95,9 @@ class RSyncChannel(StandardChannel):
                     # wait anywhere from 30s to [2,4,6] mins before retrying
                     if keep_trying:
                         r = random.randint(30, attempt * 120)
-                        print >> os.sys.stderr, ('RSync Error at attempt %i/%i'
+                        print(('RSync Error at attempt %i/%i'
                                                  ': sleeping %is') % (
-                                                     attempt, num_retries, r)
+                                                     attempt, num_retries, r), file=os.sys.stderr)
                         time.sleep(r)
 
         if rsync_rval != 0:
@@ -163,8 +157,8 @@ class DBRSyncChannel(RSyncChannel):
             raise JobError(JobError.NOJOB,
                            'No job was found to run.')
 
-        print "Selected job id=%d in table=%s in db=%s" % (
-            self.dbstate.id, self.db.tablename, self.db.dbname)
+        print("Selected job id=%d in table=%s in db=%s" % (
+            self.dbstate.id, self.db.tablename, self.db.dbname))
 
         try:
             state = expand(self.dbstate)
@@ -474,7 +468,7 @@ def runner_sqlschedules(options, dbdescr, experiment, *strings):
 
     (commands,choise_args)=generate_commands(strings)
     if verbose:
-        print commands, choise_args
+        print(commands, choise_args)
 
     if options.force:
         for cmd in commands:
@@ -483,7 +477,7 @@ def runner_sqlschedules(options, dbdescr, experiment, *strings):
             sql.add_experiments_to_db([state] * (options.repeat),
                                       db, verbose=verbose, force_dup=True)
         if options.quiet:
-            print "Added %d jobs to the db" % len(commands)
+            print("Added %d jobs to the db" % len(commands))
     else:
         #if the first insert fail, we won't force the other as the
         #force option was not gived.
@@ -500,8 +494,8 @@ def runner_sqlschedules(options, dbdescr, experiment, *strings):
             else:
                 failed+=1
                 if verbose:
-                    print "The last cmd failed to insert, we won't repeat it. use --force to force the duplicate of job in the db."
-        print "Added", len(commands) - failed, "on", len(commands), "jobs"
+                    print("The last cmd failed to insert, we won't repeat it. use --force to force the duplicate of job in the db.")
+        print("Added", len(commands) - failed, "on", len(commands), "jobs")
 runner_registry['sqlschedules'] = (parser_sqlschedules, runner_sqlschedules)
 
  ################################################################################
@@ -635,7 +629,7 @@ def runner_sql(options, dbdescr, exproot):
                 if options.workdir_dir and not os.path.exists(options.workdir_dir):
                     os.mkdir(options.workdir_dir)
                 workdir = tempfile.mkdtemp(dir=options.workdir_dir)
-            print "The working directory is:", os.path.join(os.getcwd(), workdir)
+            print("The working directory is:", os.path.join(os.getcwd(), workdir))
 
             channel = DBRSyncChannel(db,
                                      workdir,
@@ -649,7 +643,7 @@ def runner_sql(options, dbdescr, exproot):
 
             # Useful for manual tests; leave this there, just commented.
             #cachesync_runner.manualtest_before_delete()
-            with cachesync_lock(None, workdir):
+            with cachesync_runner.cachesync_lock(None, workdir):
                 # Useful for manual tests; leave this there, just
                 #commented.  cachesync_runner.manualtest_will_delete()
 
@@ -657,9 +651,9 @@ def runner_sql(options, dbdescr, exproot):
 
             n -= 1
             nrun += 1
-    except JobError, e:
+    except JobError as e:
         if e.args[0] == JobError.NOJOB:
-            print 'No more jobs to run (run %i jobs)' % nrun
+            print('No more jobs to run (run %i jobs)' % nrun)
 
 runner_registry['sql'] = (parser_sql, runner_sql)
 
@@ -715,24 +709,24 @@ runner_registry['sqlview'] = (parser_sqlview, runner_sqlview)
 
 def to_status_number(i):
     if i == 'START':
-        status = START
+        status = sql.START
     elif i == 'RUNNING':
-        status = RUNNING
+        status = sql.RUNNING
     elif i == 'DONE':
-        status = DONE
+        status = sql.DONE
     elif i == 'ERR_START':
-        status = ERR_START
+        status = sql.ERR_START
     elif i == 'ERR_SYNC':
-        status = ERR_SYNC
+        status = sql.ERR_SYNC
     elif i == 'ERR_RUN':
-        status = ERR_RUN
+        status = sql.ERR_RUN
     elif i == 'CANCELED':
-        status = CANCELED
+        status = sql.CANCELED
     else:
         try:
             status = int(i)
             assert status in [0, 1, 2, 3, 4, 5, -1]
-        except Exception, e:
+        except Exception as e:
             raise ValueError("The status must be a str in START, RUNNING, DONE, ERR_START, ERR_SYNC, ERR_RUN, CANCELED or a int in 0,1,2,3,4,5,-1")
     return status
 
@@ -803,10 +797,10 @@ def runner_sqlstatus(options, dbdescr, *ids):
         if options.print_keys:
             q = db.query(session)
             job = q.first()
-            print "Keys in the state of the first jobs",
-            for k in job.keys():
-                print k,
-            print
+            print("Keys in the state of the first jobs", end=' ')
+            for k in list(job.keys()):
+                print(k, end=' ')
+            print()
             del q, job, k
 
         if options.status:
@@ -826,7 +820,7 @@ def runner_sqlstatus(options, dbdescr, *ids):
                 k, v = param.split('=')
                 if k == 'jobman.status':
                     q = q.filter_eq(k, to_status_number(v))
-                elif isinstance(j[k], (str, unicode)):
+                elif isinstance(j[k], str):
                     q = q.filter_eq(k, v)
                 elif isinstance(j[k], float):
                     q = q.filter_eq(k, float(v))
@@ -849,7 +843,7 @@ def runner_sqlstatus(options, dbdescr, *ids):
                         if f(job[k]):
                             ids.append(job.id)
                     else:
-                        print "job", job.id, "don't have the attribute",k
+                        print("job", job.id, "don't have the attribute",k)
 
             del job, jobs, q
 
@@ -871,7 +865,7 @@ def runner_sqlstatus(options, dbdescr, *ids):
             job = db.get(id)
             if job is None:
                 if verbose > 0:
-                    print "Job id %s don't exit in the db" % (id)
+                    print("Job id %s don't exit in the db" % (id))
                 nb_jobs -= 1
                 continue
             try:
@@ -884,14 +878,14 @@ def runner_sqlstatus(options, dbdescr, *ids):
                 status = 'BrokenDB_Status_DontExist'
 
             if verbose > 1:
-                print "Job id %s, status=%d jobman.sql.priority=%s" % (id, status, str(prio)),
+                print("Job id %s, status=%d jobman.sql.priority=%s" % (id, status, str(prio)), end=' ')
 
                 for p in options.prints:
                     try:
-                        print '%s=%s' % (p, job[p]),
+                        print('%s=%s' % (p, job[p]), end=' ')
                     except KeyError:
-                        print '%s=KeyDontExist' % (p),
-                print
+                        print('%s=KeyDontExist' % (p), end=' ')
+                print()
 
             if status == RUNNING:
                 have_running_jobs = True
@@ -904,17 +898,17 @@ def runner_sqlstatus(options, dbdescr, *ids):
 
         if options.set_status:
             session.commit()
-            print "Changed the status to %d for %d jobs" % (new_status, len(ids))
+            print("Changed the status to %d for %d jobs" % (new_status, len(ids)))
         if options.reset_prio:
-            print "Reseted the priority to the default value"
+            print("Reseted the priority to the default value")
         if new_status == CANCELED and have_running_jobs:
-            print "WARNING: Canceled jobs only change the status in the db. Jobs that are already running, will continue to run. If the job finish with status COMPLETE, it will change the status to DONE. Otherwise the status won't be changed"
+            print("WARNING: Canceled jobs only change the status in the db. Jobs that are already running, will continue to run. If the job finish with status COMPLETE, it will change the status to DONE. Otherwise the status won't be changed")
 
     finally:
         session.close()
 
     if options.ret_nb_jobs:
-        print nb_jobs
+        print(nb_jobs)
 
 
 runner_registry['sqlstatus'] = (parser_sqlstatus, runner_sqlstatus)
@@ -952,7 +946,7 @@ def runner_sqlreload(options, dbdescr, table_dir, *ids):
             try:
                 ids += [int(p)]
             except ValueError:
-                print 'Skipping entry %s, as it is not a jobman id.' % p
+                print('Skipping entry %s, as it is not a jobman id.' % p)
     else:
         # Ensure that ids are all integers.
         ids = [int(d) for d in ids]

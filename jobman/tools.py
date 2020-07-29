@@ -19,6 +19,8 @@ class DD(dict):
             return super(DD, self).__setstate__
         elif attr == '__slots__':
             return super(DD, self).__slots__
+        if not attr in dict(self):
+            return None
         return self[attr]
 #         if attr.startswith('__'):
 #             return super(DD, self).__getattr__(attr)
@@ -26,7 +28,6 @@ class DD(dict):
 #             return self[attr]
 #         except KeyError:
 #             raise AttributeError(attr)
-
     def __setattr__(self, attr, value):
         # Safety check to ensure consistent behavior with __getattr__.
         assert attr not in ('__getstate__', '__setstate__', '__slots__')
@@ -42,12 +43,12 @@ class DD(dict):
 
     def __deepcopy__(self, memo):
         z = DD()
-        for k,kv in self.iteritems():
+        for k,kv in self.items():
             z[k] = copy.deepcopy(kv, memo)
         return z
 
 def defaults_merge(d, defaults):
-    for k, v in defaults.iteritems():
+    for k, v in defaults.items():
         if isinstance(v, dict):
             defaults_merge(d.setdefault(k, DD()), v)
         else:
@@ -66,14 +67,14 @@ def resolve(name, try_import=True):
     symbols = name.split('.')
     try:
         builder = __import__(symbols[0])
-    except ImportError, e:
+    except ImportError as e:
         e.args+=("Error while resolving %s from %s"%(symbols, name),)
         raise
     try:
         for sym in symbols[1:]:
             try:
                 builder = getattr(builder, sym)
-            except AttributeError, e:
+            except AttributeError as e:
                 if try_import:
                     # We need to convert it to a script as with EPD7.1-1
                     # sym is a unicode string and __import__ don't accept it
@@ -81,7 +82,7 @@ def resolve(name, try_import=True):
                     builder = getattr(builder, sym)
                 else:
                     raise e
-    except (AttributeError, ImportError), e:
+    except (AttributeError, ImportError) as e:
         raise type(e)('Failed to resolve compound symbol %s' % name, e)
     return builder
 
@@ -107,7 +108,7 @@ def _reval(s, depth, d):
     s = s.replace('%', '__auto_')
 
     newvars = dict(resolve = resolve)
-    for k, v in d.iteritems():
+    for k, v in d.items():
         newvars['__auto_%s' % k] = v
         if k not in required:
             raise Exception('There is no %s variable to substitute in %s' % (k, orig_s))
@@ -133,14 +134,14 @@ def flatten(obj):
         # mapping between the dictionary version and the flattened version.
         prevent_flatten = False
         if isinstance(obj, dict) and not isinstance(obj, DD):
-            for k in obj.iterkeys():
-                if not isinstance(k, basestring):
+            for k in obj.keys():
+                if not isinstance(k, str):
                     prevent_flatten = True
                     break
         # TODO: add numpy.floating, numpy.integer?
         if (prevent_flatten or
             # add numpy.ndarray
-            isinstance(obj, (str, unicode, int, float, list, tuple, set)) or
+            isinstance(obj, (str, int, float, list, tuple, set)) or
             obj in (True, False, None)):
             # We do not flatten these objects.
             d[prefix] = obj #convert(obj)
@@ -152,7 +153,7 @@ def flatten(obj):
                 subd['__builder__'] = '%s.%s' % (obj.__module__, obj.__class__.__name__)
             else:
                 raise TypeError('Cannot flatten object %s, of type %s, for prefix %s' % (str(obj), str(type(obj)), prefix))
-            for k, v in subd.iteritems():
+            for k, v in subd.items():
                 if prefix:
                     pfx = '.'.join([prefix, k])
                 else:
@@ -165,7 +166,7 @@ def flatten(obj):
 def expand(d, dict_type=DD):
     """inverse of flatten()"""
     struct = dict_type()
-    for k, v in d.iteritems():
+    for k, v in d.items():
         if k == '':
             raise NotImplementedError()
         else:
@@ -179,7 +180,7 @@ def expand(d, dict_type=DD):
 def realize(d):
     if not isinstance(d, dict):
         return d
-    d = dict((k, realize(v)) for k, v in d.iteritems())
+    d = dict((k, realize(v)) for k, v in d.items())
     if '__builder__' in d:
         builder = resolve(d.pop('__builder__'))
         return builder(**d)
@@ -195,7 +196,7 @@ def realize2(d, depth):
     if not isinstance(d, dict):
         return d
     # note: we need to add 1 to depth because the call is in a generator expression
-    d = dict((k, realize2(v, depth + 1)) for k, v in d.iteritems())
+    d = dict((k, realize2(v, depth + 1)) for k, v in d.items())
     if '__builder__' in d:
         return _reval(d.pop('__builder__'), depth, d)
     return d
@@ -223,7 +224,7 @@ def format_d(d, sep = '\n', space = True):
         pattern = "%s = %r"
     else:
         pattern = "%s=%r"
-    return sep.join(pattern % (k, v) for k, v in d.iteritems())
+    return sep.join(pattern % (k, v) for k, v in d.items())
 
 def format_help(topic):
     if topic is None:
@@ -237,7 +238,7 @@ def format_help(topic):
     if not help:
         return 'No help.'
 
-    ss = map(str.rstrip, help.split('\n'))
+    ss = list(map(str.rstrip, help.split('\n')))
     try:
         baseline = min([len(line) - len(line.lstrip()) for line in ss if line])
     except:
@@ -253,7 +254,7 @@ def format_help(topic):
 ### Helper functions operating on experiment directories
 ################################################################################
 
-from jobman import parse
+from . import parse
 def find_conf_files(cwd, fname='current.conf', recurse=True):
     """
     This generator will iterator from the given directory, and find all job
@@ -273,7 +274,7 @@ def find_conf_files(cwd, fname='current.conf', recurse=True):
         try:
             jobdd = DD(parse.filemerge(os.path.join(e, fname)))
         except IOError:
-            print "WARNING: %s file not found. Skipping it" % os.path.join(e, fname)
+            print("WARNING: %s file not found. Skipping it" % os.path.join(e, fname))
             continue
 
         try:
@@ -302,7 +303,7 @@ def rebuild_DB_from_FS(db, cwd='./', keep_id=True, verbose=False):
         if status: tot += 1
 
         if verbose:
-            print '** inserted job %i **' % jobdd[sql.JOBID]
+            print('** inserted job %i **' % jobdd[sql.JOBID])
 
     if verbose:
-        print '==== Inserted %i jobs ====' % tot
+        print('==== Inserted %i jobs ====' % tot)

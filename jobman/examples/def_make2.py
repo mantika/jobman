@@ -8,6 +8,6 @@ class Plumber(object):
 def experiment(state, channel):
     exclamation_mark = '!'
     obj = make2(state.plumber)
-    print obj.statement
+    print(obj.statement)
     return channel.COMPLETE
 

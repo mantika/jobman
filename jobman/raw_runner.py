@@ -1,8 +1,7 @@
 import logging, time, os
 
-from runner import runner_registry
+from .runner import runner_registry
 from optparse import OptionParser
-
 parser_raw = OptionParser(usage = '%prog raw [options] <expr>',
                           add_help_option=False)
 parser_raw.add_option('--workdir', dest = 'workdir', type = 'str', default = '',

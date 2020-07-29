@@ -6,10 +6,9 @@ __contact__   = "Xavier Muller <xav.muller@gmail.com>"
 
 import os
 from optparse import OptionParser
-
-from jobman.parse import filemerge
-from jobman.parse import standard as jparse
-from jobman.runner import runner_registry
+from .parse import filemerge
+from .parse import standard as jparse
+from .runner import runner_registry
 
 
 
@@ -43,15 +42,15 @@ def runner_findjob(options, *strings):
 
     if options.group:
         exp_dirs = get_dir_by_key_name(dirs, keys, not options.dont_sort)
-        print "Keys:",keys
+        print("Keys:",keys)
         for group_id in range(exp_dirs[0]):
-            print 'Keys =',exp_dirs[1][group_id]
+            print('Keys =',exp_dirs[1][group_id])
             for exp_dir in exp_dirs[2][group_id]:
-                print exp_dir[0]
+                print(exp_dir[0])
     else:
         exp_dirs = get_dir_by_key_value(dirs, keys)
         for d,id in exp_dirs:
-            print d
+            print(d)
     
 
 runner_registry['findjob'] = (parser_findjob, runner_findjob)
@@ -216,7 +215,7 @@ def get_dir_by_key_value(dirs, keys=['seed=0']):
                         kval = params.get(t)
                         skip -= 1
 
-                for fkey,fval in keys_to_match.iteritems():
+                for fkey,fval in keys_to_match.items():
                     kval = params.get(fkey, None)
                     if kval == fval:
                         skip -= 1

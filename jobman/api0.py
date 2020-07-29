@@ -145,7 +145,7 @@ class DbHandle (object):
                 k_self.bval = None
                 k_self.sval = None
 
-                if isinstance(val, (str,unicode)):
+                if isinstance(val, str):
                     k_self.type = 's'
                     k_self.sval = val
                 elif isinstance(val, float):
@@ -251,10 +251,10 @@ class DbHandle (object):
                     s.close()
 
             def __iter__(d_self):
-                return iter(d_self.keys())
+                return iter(list(d_self.keys()))
 
             def iteritems(d_self):
-                return d_self.items()
+                return list(d_self.items())
 
             def items(d_self):
                 return [(kv.name, kv.val) for kv in d_self._attrs]
@@ -277,9 +277,9 @@ class DbHandle (object):
                 :note: This function may raise `psycopg2.OperationalError`.
                 """
                 session.add(d_self)
-                for k, v in dct.iteritems():
+                for k, v in dct.items():
                     d_self._set_in_session(k, v, session)
-                for k, v in kwargs.iteritems():
+                for k, v in kwargs.items():
                     d_self._set_in_session(k, v, session)
 
             def update_in_session(d_self, dct, session, _recommit_times=5, _recommit_waitsecs=10, **kwargs):
@@ -444,7 +444,7 @@ class DbHandle (object):
                 #Note: when we add new types to the key columns, add them here
                 q = q_self._query
                 T = h_self._Dict
-                if isinstance(arg, (str,unicode)):
+                if isinstance(arg, str):
                     q = q.filter(T._attrs.any(name=kw, sval=arg))
                 elif isinstance(arg, float):
                     q = q.filter(T._attrs.any(name=kw, fval=arg))
@@ -457,7 +457,7 @@ class DbHandle (object):
 
             def filter_eq_dct(q_self, dct):
                 rval = q_self
-                for key, val in dct.items():
+                for key, val in list(dct.items()):
                     rval = rval.filter_eq(key,val)
                 return rval
 
@@ -636,7 +636,7 @@ class DbHandle (object):
                 from_obj = big_join)
         main_query = main_query.compile()
         quoted_params = {}
-        for (key, val) in main_query.params.items():
+        for (key, val) in list(main_query.params.items()):
             quoted_params[key] = repr(val)
         main_query_sql = str(main_query) % quoted_params
 
@@ -645,7 +645,7 @@ class DbHandle (object):
         create_view_sql = 'CREATE VIEW %s AS %s'\
                 % (viewname, main_query_sql)
         if verbose:
-            print 'Creating sql view with command:\n', create_view_sql
+            print('Creating sql view with command:\n', create_view_sql)
 
         # Execution
         h_self._engine.execute(drop_view_sql);
@@ -671,7 +671,7 @@ class DbHandle (object):
 
         drop_view_sql = 'DROP VIEW %s'%(viewname)
         if verbose:
-            print 'Deleting sql view with command:\n', drop_view_sql
+            print('Deleting sql view with command:\n', drop_view_sql)
 
         # Execution
         h_self._engine.execute(drop_view_sql);

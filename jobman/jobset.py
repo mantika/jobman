@@ -122,5 +122,5 @@ def jobset_map(fn, arg_seq, method=JobSet, path=None, cleanup=True):
     states = [to_jobstate(fn, arg) for arg in arg_seq]
     jobset.update(states)
     jobset.wait()                     # computation takes place here
-    return map(from_jobstate, states)
+    return list(map(from_jobstate, states))
     

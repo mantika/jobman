@@ -22,6 +22,6 @@ setup(name='Jobman',
       url='http://www.deeplearning.net/software/jobman',
       packages=['jobman', 'jobman.examples', 'jobman.analyze', 'jobman.dbi',
                 ],
-      scripts=['bin/jobman', 'bin/jobdispatch']
-
-           )
+      scripts=['bin/jobman', 'bin/jobdispatch'],
+    install_requires = ['sqlalchemy'],
+)

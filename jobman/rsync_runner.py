@@ -1,12 +1,11 @@
 import datetime, logging, os, random, shutil, socket, sys
 import tempfile, time, traceback
 
-import SocketServer
+import socketserver
 import threading
 
-from runner import runner_registry
+from .runner import runner_registry
 from optparse import OptionParser
-
 _logger = logging.getLogger('jobman.rsync_runner')
 #_logger.addHandler(logging.StreamHandler(sys.stderr))
 #_logger.setLevel(logging.DEBUG)
@@ -26,7 +25,7 @@ def __saltedhash(string, salt):
     sha256 = hashlib.new('sha512')
     sha256.update(string)
     sha256.update(salt)
-    for x in xrange(HASH_REPS): 
+    for x in range(HASH_REPS): 
         sha256.update(sha256.digest())
         if x % 10: sha256.update(salt)
     return sha256
@@ -44,7 +43,7 @@ def saltedhash_hex(string, salt):
 ###############
 
 
-class MyTCPHandler(SocketServer.BaseRequestHandler):
+class MyTCPHandler(socketserver.BaseRequestHandler):
     """
     The RequestHandler class for our server.
 
@@ -106,7 +105,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                             os.path.join(os.path.join(self.exproot, self.done, choice)))
                 else:
                     choice = ''
-            except (OSError,IOError), e:
+            except (OSError,IOError) as e:
                 _logger.error('Error booking ' + str(e))
                 choice = ''
         finally:
@@ -151,7 +150,7 @@ def runner_serve(options, path):
         os.makedirs(os.path.join(path, MyTCPHandler.done))
 
     # Create the server, binding to localhost on port 9999
-    server = SocketServer.TCPServer((HOST, PORT), MyTCPHandler)
+    server = socketserver.TCPServer((HOST, PORT), MyTCPHandler)
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
@@ -252,17 +251,17 @@ def run_callback_in_rsynced_tempdir(remote_rsync_loc, callback,
             localhost = socket.gethostname()
             statusfile = open(status_filename, 'a+')
             now = str(datetime.datetime.now())
-            print >> statusfile, "%(now)s Running %(callbackname)s in %(localhost)s:%(tmpdir)s" % locals()
+            print("%(now)s Running %(callbackname)s in %(localhost)s:%(tmpdir)s" % locals(), file=statusfile)
         rsync(tmpdir, remote_rsync_loc, exclusions=['*.no_sync_to_server', '*.no_sync'])
 
         try:
             callback()
-        except Exception, e:
+        except Exception as e:
             traceback.print_exc() # goes to sys.stderr
 
         if status_filename:
             now = str(datetime.datetime.now())
-            print >> statusfile, "%(now)s Done %(callbackname)s in %(localhost)s:%(tmpdir)s" % locals()
+            print("%(now)s Done %(callbackname)s in %(localhost)s:%(tmpdir)s" % locals(), file=statusfile)
             statusfile.flush()
 
         sys.stdout.flush()
@@ -325,7 +324,7 @@ def runner_rsyncany(options, addr, fullfn):
     # by moving any job from the todo subdir to the done subdir
     jobname = server_getjob(user, host, port, expdir)
     if jobname == '':
-        print "No more jobs"
+        print("No more jobs")
         return
     _logger.info('handling jobname: %s' % jobname)
     jobdir = os.path.join(expdir, jobname)

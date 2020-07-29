@@ -16,7 +16,7 @@ try:
         from sqlalchemy.orm.exc import StaleDataError as CONCURRENT_ERROR
     except ImportError:
         from sqlalchemy.orm.exc import ConcurrentModificationError as CONCURRENT_ERROR
-            
+
 except ImportError:
     sqlalchemy_ok = False
 
@@ -54,8 +54,8 @@ def book_dct_postgres_serial(db, retry_max_sleep=10.0, verbose=1):
     a "consumer" for a Producer-Consumer pattern based on the database.
 
     """
-    print >> sys.stderr, """#TODO: use the priority field, not the status."""
-    print >> sys.stderr, """#TODO: ignore entries with key PUSH_ERROR."""
+    print("""#TODO: use the priority field, not the status.""", file=sys.stderr)
+    print("""#TODO: ignore entries with key PUSH_ERROR.""", file=sys.stderr)
 
     s = db.session() #open a new session
 
@@ -86,35 +86,36 @@ def book_dct_postgres_serial(db, retry_max_sleep=10.0, verbose=1):
         try:
             #first() may raise psycopg2.ProgrammingError
             dct = q.first()
-
             if dct is not None:
-                assert (dct not in dcts_seen)
-                if verbose: print 'book_unstarted_dct retrieved, ', dct
+                dct_hashed = hash(tuple(sorted(dct.items())))
+                assert (dct_hashed not in dcts_seen)
+                if verbose: print('book_unstarted_dct retrieved, ', dct)
                 dct._set_in_session(STATUS, RUNNING, s)
                 if 1:
                     if _TEST_CONCURRENCY:
-                        print >> sys.stderr, 'SLEEPING BEFORE BOOKING'
+                        print('SLEEPING BEFORE BOOKING', file=sys.stderr)
                         time.sleep(10)
 
                     #commit() may raise psycopg2.ProgrammingError
                     s.commit()
                 else:
-                    print >> sys.stderr, 'DEBUG MODE: NOT RESERVING JOB!', dct
+                    print('DEBUG MODE: NOT RESERVING JOB!', dct, file=sys.stderr)
                 #if we get this far, the job is ours!
             else:
                 # no jobs are left
                 keep_trying = False
-        except (sqlalchemy.exc.DBAPIError, CONCURRENT_ERROR), e:
+        except (sqlalchemy.exc.DBAPIError, CONCURRENT_ERROR) as e:
             #either the first() or the commit() raised
             s.rollback() # docs say to do this (or close) after commit raises exception
-            if verbose: print 'caught exception', e
+            if verbose: print('caught exception', e)
             if dct:
                 # first() succeeded, commit() failed
-                dcts_seen.add(dct)
+                dct_hashed = hash(tuple(sorted(dct.items())))
+                dcts_seen.add(dct_hashed)
                 dct = None
             wait = random.random()*retry_max_sleep
-            if verbose: print 'another process stole our dct. Waiting %f secs' % wait
-            print 'waiting for %i second' % wait
+            if verbose: print('another process stole our dct. Waiting %f secs' % wait)
+            print('waiting for %i second' % wait)
             time.sleep(wait)
 
     if dct:
@@ -123,8 +124,8 @@ def book_dct_postgres_serial(db, retry_max_sleep=10.0, verbose=1):
     return dct
 
 def book_dct_non_postgres(db):
-    print >> sys.stderr, """#TODO: use the priority field, not the status."""
-    print >> sys.stderr, """#TODO: ignore entries with key self.push_error."""
+    print("""#TODO: use the priority field, not the status.""", file=sys.stderr)
+    print("""#TODO: ignore entries with key self.push_error.""", file=sys.stderr)
 
     raise NotImplementedError()
 
@@ -132,7 +133,7 @@ def db(dbstr):
     """ DEPRECATED: call api0.open_db(dbstr), which has the same api """
     import warnings
     warnings.warn("sql.db is deprecated, call api0.open_db", DeprecationWarning)
-    import api0
+    from . import api0
     return api0.open_db(dbstr)
 
 ###########
@@ -140,12 +141,12 @@ def db(dbstr):
 ###########
 
 def hash_state(state):
-    l = list((k,str(v)) for k,v in state.iteritems())
+    l = list((k,str(v)) for k,v in state.items())
     l.sort()
     return hash(hashlib.sha224(repr(l)).hexdigest())
 
 def hash_state_old(state):
-    return hash(`state`)
+    return hash(repr(state))
 
 def insert_dict(jobdict, db, force_dup=False, session=None, priority=1.0, hashalgo=hash_state):
     """Insert a new `job` dictionary into database `db`.
@@ -229,7 +230,7 @@ def add_experiments_to_db(jobs, db, verbose=0, force_dup=False, type_check=None,
 
         if do_insert:
             if type_check:
-                for k,v in job.items():
+                for k,v in list(job.items()):
                     if type(v) != getattr(type_check, k):
                         raise TypeError('Experiment contains value with wrong type',
                                 ((k,v), getattr(type_check, k)))
@@ -237,12 +238,12 @@ def add_experiments_to_db(jobs, db, verbose=0, force_dup=False, type_check=None,
             job[STATUS] = START
             job[PRIORITY] = 1.0
             if verbose:
-                print 'ADDING  ', job
+                print('ADDING  ', job)
             db.insert(job)
             rval.append((True, job))
         else:
             if verbose:
-                print 'SKIPPING', job
+                print('SKIPPING', job)
             rval.append((False, job))
     return rval
 
@@ -254,7 +255,7 @@ def duplicate_job(db, job_id, priority=1.0, delete_keys=[], *args, **kwargs):
 
     :param delete_keys:
 
-    :param kwargs: can be used to modify the top-level dictionary before it is 
+    :param kwargs: can be used to modify the top-level dictionary before it is
                    reinserted in the DB.
     :param args: since jobdict is a hierarchical dictionary, args is a variable
                  length list containing ('path_to_subdict',subdict_update) pairs
