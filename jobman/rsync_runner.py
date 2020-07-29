@@ -1,7 +1,11 @@
+from __future__ import print_function    # (at top of module)
 import datetime, logging, os, random, shutil, socket, sys
 import tempfile, time, traceback
 
-import socketserver
+try:
+    import socketserver
+except ImportError:
+    import SocketServer as socketserver
 import threading
 
 from .runner import runner_registry

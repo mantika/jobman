@@ -1,4 +1,4 @@
-""" WRITEME """
+from __future__ import print_function    # (at top of module)
 
 from . import cachesync_runner
 

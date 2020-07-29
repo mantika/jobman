@@ -1,6 +1,22 @@
+from __future__ import print_function    # (at top of module)
+
 import sys
 import os
-import subprocess
+
+try:
+    from subprocess import getstatusoutput
+except ImportError:
+    from subprocess import check_output, CalledProcessError, STDOUT
+    def getstatusoutput(cmd):
+        try:
+            data = check_output(cmd, shell=True, universal_newlines=True, stderr=STDOUT)
+            status = 0
+        except CalledProcessError as ex:
+            data = ex.output
+            status = ex.returncode
+        if data[-1:] == '\n':
+            data = data[:-1]
+        return status, data
 import os.path
 import glob
 import time
@@ -23,12 +39,12 @@ _endmsg = "so 'jobman cachesync' will be unsafe" \
 
 def _lockfile_not_available(host_string=None):
     if host_string:
-        retcode, output = subprocess.getstatusoutput("ssh " + host_string + " \"lockfile -v\"")
+        retcode, output = getstatusoutput("ssh " + host_string + " \"lockfile -v\"")
         if not output.startswith("lockfile v"):
             return "Remote host seems to not have the 'lockfile' utility," \
                    + _endmsg
     else:
-        retcode, output = subprocess.getstatusoutput("lockfile -v")
+        retcode, output = getstatusoutput("lockfile -v")
         if not output.startswith("lockfile v"):
             return "'lockfile' utility apparently not available, " + _endmsg
 

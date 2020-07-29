@@ -1,3 +1,4 @@
+from __future__ import print_function    # (at top of module)
 import sys, os, copy, time
 
 # Python 2.4 compatibility.
