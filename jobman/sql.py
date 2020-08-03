@@ -1,4 +1,7 @@
-from __future__ import print_function    # (at top of module)
+from __futur\ie__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from builtins import str
 import sys, os, copy, time
 
 # Python 2.4 compatibility.
@@ -8,7 +11,7 @@ except ImportError:
     import md5 as hashlib
 
 import random
-
+import json
 sqlalchemy_ok = True
 try:
     import sqlalchemy
@@ -17,7 +20,7 @@ try:
         from sqlalchemy.orm.exc import StaleDataError as CONCURRENT_ERROR
     except ImportError:
         from sqlalchemy.orm.exc import ConcurrentModificationError as CONCURRENT_ERROR
-
+            
 except ImportError:
     sqlalchemy_ok = False
 
@@ -88,8 +91,7 @@ def book_dct_postgres_serial(db, retry_max_sleep=10.0, verbose=1):
             #first() may raise psycopg2.ProgrammingError
             dct = q.first()
             if dct is not None:
-                dct_hashed = hash(tuple(sorted(dct.items())))
-                assert (dct_hashed not in dcts_seen)
+                assert (hash(json.dumps(sorted(list(dct.items())))) not in dcts_seen)
                 if verbose: print('book_unstarted_dct retrieved, ', dct)
                 dct._set_in_session(STATUS, RUNNING, s)
                 if 1:
@@ -111,8 +113,7 @@ def book_dct_postgres_serial(db, retry_max_sleep=10.0, verbose=1):
             if verbose: print('caught exception', e)
             if dct:
                 # first() succeeded, commit() failed
-                dct_hashed = hash(tuple(sorted(dct.items())))
-                dcts_seen.add(dct_hashed)
+                dcts_seen.add(hash(json.dumps(sorted(list(dct.items())))))
                 dct = None
             wait = random.random()*retry_max_sleep
             if verbose: print('another process stole our dct. Waiting %f secs' % wait)
@@ -256,7 +257,7 @@ def duplicate_job(db, job_id, priority=1.0, delete_keys=[], *args, **kwargs):
 
     :param delete_keys:
 
-    :param kwargs: can be used to modify the top-level dictionary before it is
+    :param kwargs: can be used to modify the top-level dictionary before it is 
                    reinserted in the DB.
     :param args: since jobdict is a hierarchical dictionary, args is a variable
                  length list containing ('path_to_subdict',subdict_update) pairs

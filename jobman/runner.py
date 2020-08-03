@@ -1,3 +1,6 @@
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
 import os
 import sys
 import time
@@ -6,6 +9,7 @@ import inspect
 import shutil
 import optparse
 from optparse import OptionParser
+
 from .tools import DD, expand, format_help, resolve, UsageError
 from .channel import StandardChannel
 
@@ -81,8 +85,8 @@ def warn_if_sql_failure():
             # Note: we use `RuntimeWarning` instead of `ImportWarning` because
             # the latter are ignored by default, and we do not want it to be
             # ignored.
-            print(("WARNING: SQL-related module '%s' could not be imported: SQL"
-                   " features will most likely crash" % module))
+            print ("WARNING: SQL-related module '%s' could not be imported: SQL"
+                   " features will most likely crash" % module)
 
 
 ################################################################################

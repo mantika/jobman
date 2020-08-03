@@ -1,3 +1,6 @@
+from __future__ import print_function
+from __future__ import unicode_literals
+from builtins import range
 __authors__   = "Guillaume Desjardin, Xavier Muller"
 __copyright__ = "(c) 2010, Universite de Montreal"
 __license__   = "3-clause BSD License"
@@ -6,9 +9,10 @@ __contact__   = "Xavier Muller <xav.muller@gmail.com>"
 
 import os
 from optparse import OptionParser
-from .parse import filemerge
-from .parse import standard as jparse
-from .runner import runner_registry
+
+from jobman.parse import filemerge
+from jobman.parse import standard as jparse
+from jobman.runner import runner_registry
 
 
 

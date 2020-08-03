@@ -49,7 +49,7 @@ for first in 0,2,4,6,8,10:
 @mydriver.mydriver_cmd_desc('list the contents of the database')
 def list_all(db, **kwargs):
     for d in db:
-        print(d.id, list(d.items()))
+        print d.id, d.items()
 
 
 # Here we identify our username, and the database to log in to...

@@ -1,15 +1,19 @@
-from __future__ import print_function    # (at top of module)
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import range
 import datetime, logging, os, random, shutil, socket, sys
 import tempfile, time, traceback
 
-try:
-    import socketserver
-except ImportError:
-    import SocketServer as socketserver
+import socketserver
 import threading
 
 from .runner import runner_registry
 from optparse import OptionParser
+
 _logger = logging.getLogger('jobman.rsync_runner')
 #_logger.addHandler(logging.StreamHandler(sys.stderr))
 #_logger.setLevel(logging.DEBUG)

@@ -1,4 +1,4 @@
-import os, pickle
+import os, cPickle
 
 args_filename = 'args.pkl'
 results_filename = 'results.pkl'
@@ -18,8 +18,8 @@ def jobs_iter(exproot):
 
 def load_pkl(path):
     try:
-        return pickle.load(open(path))
-    except (OSError, IOError) as e:
+        return cPickle.load(open(path))
+    except (OSError, IOError), e:
         return None
 def load_args(jobroot):
     return load_pkl(os.path.join(jobroot, args_filename))
@@ -51,22 +51,22 @@ def new_names(exproot, N, format=new_jobname_format):
 def new_name(exproot, format=new_jobname_format):
     return new_names(exproot, 1, format=format)[0]
 
-def add_named_jobs(exproot, name_list, args_list, protocol=pickle.HIGHEST_PROTOCOL):
+def add_named_jobs(exproot, name_list, args_list, protocol=cPickle.HIGHEST_PROTOCOL):
     rval = []
     for name, args in zip(name_list, args_list):
         jobroot = os.path.join(exproot, name)
         os.mkdir(jobroot)
         if args is not None:
-            pickle.dump(args, 
+            cPickle.dump(args, 
                     open(os.path.join(exproot, name, args_filename), 'w'),
                     protocol=protocol)
         rval.append((jobroot, args))
     return rval
 
-def add_anon_jobs(exproot, args_list, protocol=pickle.HIGHEST_PROTOCOL):
+def add_anon_jobs(exproot, args_list, protocol=cPickle.HIGHEST_PROTOCOL):
     return add_named_jobs(exproot, new_names(exproot, len(args_list)), args_list,protocol)
 
-def add_unique_jobs(exproot, args_list, protocol=pickle.HIGHEST_PROTOCOL):
+def add_unique_jobs(exproot, args_list, protocol=cPickle.HIGHEST_PROTOCOL):
     # load existing jobs from db
     existing_args = [args for args in [load_args(path) for (name,path) in jobs_iter(exproot)]
             if args is not None]

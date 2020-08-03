@@ -1,8 +1,13 @@
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from builtins import object
 import os
 import logging
 
 from jobman.runner import runner_registry
 from optparse import OptionParser
+
 _logger = logging.getLogger('jobman.analyze_runner')
 
 parser_analyze = OptionParser(usage = '%prog rsync_any [options] <tablepath> <exproot>',
@@ -27,14 +32,14 @@ def runner_analyze(options, cmdname):
     """
     #parse the address
     if options.addr.startswith('pkl://'):
-        import analyze.pkl
+        from .analyze import pkl
         exproot = options.addr[len('pkl://'):]
     elif options.addr.startswith('postgres://') or options.addr.startswith('sqlite://'):
         raise NotImplementedError()
-        import analyze.pg
+        from .analyze import pg
     elif options.addr.startswith('dd://'):
         raise NotImplementedError()
-        import analyze.dd
+        from .analyze import dd
     else:
         raise NotImplementedError('unknown address format, it should start with "pkl" or'
                 ' "postgres" or "dd"', options.addr)

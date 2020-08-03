@@ -2,7 +2,10 @@
 
 warning: EXPERIMENTAL
 """
+from __future__ import unicode_literals
 
+from builtins import map
+from builtins import object
 class JobSet(object):
     """Class representing an set of jobs, each represented by their DD "state" variables.
 

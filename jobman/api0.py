@@ -2,7 +2,11 @@
 This file defines class `DbHandle` and a few routines for creating instances of DbHandle.
 
 """
+from __future__ import print_function
+from __future__ import unicode_literals
 
+from builtins import str
+from builtins import object
 from jobman import sql
 
 if sql.sqlalchemy_ok:
@@ -145,7 +149,7 @@ class DbHandle (object):
                 k_self.bval = None
                 k_self.sval = None
 
-                if isinstance(val, str):
+                if isinstance(val, (str,str)):
                     k_self.type = 's'
                     k_self.sval = val
                 elif isinstance(val, float):
@@ -444,7 +448,7 @@ class DbHandle (object):
                 #Note: when we add new types to the key columns, add them here
                 q = q_self._query
                 T = h_self._Dict
-                if isinstance(arg, str):
+                if isinstance(arg, (str,str)):
                     q = q.filter(T._attrs.any(name=kw, sval=arg))
                 elif isinstance(arg, float):
                     q = q.filter(T._attrs.any(name=kw, fval=arg))

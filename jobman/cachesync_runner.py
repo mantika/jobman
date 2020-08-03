@@ -1,22 +1,15 @@
-from __future__ import print_function    # (at top of module)
-
+from __future__ import with_statement 
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import range
+from builtins import object
 import sys
 import os
-
-try:
-    from subprocess import getstatusoutput
-except ImportError:
-    from subprocess import check_output, CalledProcessError, STDOUT
-    def getstatusoutput(cmd):
-        try:
-            data = check_output(cmd, shell=True, universal_newlines=True, stderr=STDOUT)
-            status = 0
-        except CalledProcessError as ex:
-            data = ex.output
-            status = ex.returncode
-        if data[-1:] == '\n':
-            data = data[:-1]
-        return status, data
+import subprocess
 import os.path
 import glob
 import time
@@ -34,28 +27,26 @@ import platform
 CACHESYNC_VERBOSE = False
 CACHESYNC_LOCK = True
 _endmsg = "so 'jobman cachesync' will be unsafe" \
-          + " (might cause corruption if called around the time the job ends)."
-
+        + " (might cause corruption if called around the time the job ends)."
 
 def _lockfile_not_available(host_string=None):
     if host_string:
-        retcode, output = getstatusoutput("ssh " + host_string + " \"lockfile -v\"")
+        retcode, output = subprocess.getstatusoutput("ssh "+host_string+" \"lockfile -v\"")
         if not output.startswith("lockfile v"):
-            return "Remote host seems to not have the 'lockfile' utility," \
-                   + _endmsg
+            return "Remote host seems to not have the 'lockfile' utility,"\
+                    + _endmsg
     else:
-        retcode, output = getstatusoutput("lockfile -v")
+        retcode, output = subprocess.getstatusoutput("lockfile -v")
         if not output.startswith("lockfile v"):
             return "'lockfile' utility apparently not available, " + _endmsg
 
     return None
 
-
 @contextmanager
 def cachesync_lock(host_string, tmp_dir_to_lock):
     '''
     Used to make sure we don't rsync from the two sides at the same
-    time. Relies on DistributedLock, below, which itself relies on
+    time. Relies on DistributedLock, below, which itself relies on 
     the "lockfile" utility under UNIX.
 
     Doesn't do anything when lockfile is not available on target
@@ -112,17 +103,16 @@ def cachesync_lock(host_string, tmp_dir_to_lock):
             # and lock_path, to see if we have proper rights on the file
             # This CAN happen when killing the program, though, at least.
             raise RuntimeError('cachesync lock could not be acquired.')
-
+        
     try:
         yield
     finally:
         if lock:
             lock.release()
 
-
 class DistributedLock(object):
     def __init__(self, host_string, lock_path,
-                 force_if_older=15, retries=20, sleeptime=1):
+                        force_if_older=15, retries=20, sleeptime=1):
         '''
         Used to make sure we don't rsync from the two sides at the same
         time. Yet this could also be used for other locks, if the need
@@ -135,7 +125,7 @@ class DistributedLock(object):
         Parameters
         ----------
         host_string : str or None
-            String to use in calling SSH to connect to the node, e.g.
+            String to use in calling SSH to connect to the node, e.g. 
             "username:password@my.node.address", or None
             if it's called from the job itself (ie. locally on the node)
         lock_path : str
@@ -172,7 +162,7 @@ class DistributedLock(object):
 
     def acquire(self):
         command = "lockfile -r " + str(self.retries)
-        command += " -" + str(self.sleeptime * 60)
+        command += " -" + str(self.sleeptime*60)
         command += " -l " + str(self.force_if_older * 60)
         command += " " + self.lock_path
 
@@ -185,7 +175,7 @@ class DistributedLock(object):
 
     def release(self):
         if self.lock_acquired:
-            command = "rm -f " + self.lock_path
+            command = "rm -f " + self.lock_path        
             return self.exec_command(command)
 
     def exec_command(self, command):
@@ -194,26 +184,25 @@ class DistributedLock(object):
         else:
             command = "ssh " + self.host_string + " \"" + command + "\""
             retcode = os.system(command)
-
+     
         return retcode
 
     def __str__(self):
         return "DistributedLock(" + str(self.host_string) + ", " + str(self.lock_path) + ")"
-
-
+     
 def sync_single_directory(dir_path, all_jobs=None, force=False):
     if not all_jobs:
         conf = DD(parse.filemerge(os.path.join(dir_path, 'current.conf')))
     else:
         conf = [i for i in all_jobs if str(i.id) == os.path.split(dir_path)[-1]]
-        assert len(conf) == 1
+        assert len(conf)==1
         conf = conf[0]
 
-    if 'jobman.status' not in conf \
-            or 'jobman.sql.host_workdir' not in conf \
-            or 'jobman.sql.host_name' not in conf:
+    if 'jobman.status' not in conf\
+       or 'jobman.sql.host_workdir' not in conf \
+       or 'jobman.sql.host_name' not in conf:
         print("abort for", dir_path, " because at least one of jobman.status,", \
-              "jobman.sql.host_workdir or jobman.sql.host_name is not specified.")
+                "jobman.sql.host_workdir or jobman.sql.host_name is not specified.")
         print("Try giving the --sql option if possible")
         return
 
@@ -225,7 +214,6 @@ def sync_single_directory(dir_path, all_jobs=None, force=False):
             return
 
     perform_sync(dir_path, conf)
-
 
 def perform_sync(dir_path, conf):
     remote_dir = copy.copy(conf['jobman.sql.host_workdir'])
@@ -248,7 +236,6 @@ def perform_sync(dir_path, conf):
 
         print("return code was for last command was", return_code)
 
-
 def sync_all_directories(base_dir, all_jobs=None, force=False):
     oldcwd = os.getcwd()
     os.chdir(base_dir)
@@ -266,7 +253,6 @@ def sync_all_directories(base_dir, all_jobs=None, force=False):
         full_path = os.path.join(base_dir, dir)
 
         sync_single_directory(full_path, all_jobs, force)
-
 
 def cachesync_runner(options, dir):
     """
@@ -297,7 +283,7 @@ def cachesync_runner(options, dir):
     Examples:
 
         # syncs all subdirectories 1, 2 ...
-        jobman cachesync -m myexperiment/mydbname/mytablename
+        jobman cachesync -m myexperiment/mydbname/mytablename 
 
     Normally completed jobs (status = DONE) won't be synced based on
     the "status" set in current.conf. Yet you can force sync by using
@@ -309,37 +295,37 @@ def cachesync_runner(options, dir):
     Purpose of this command
     -----------------------
 
-    To clarify the purpose of the cachesync command: when launching jobs,
+    To clarify the purpose of the cachesync command: when launching jobs, 
     working directories are created for each job. For example, when launching:
 
     dbidispatch jobman sql 'postgres://user@gershwin/mydatabase?table=mytable' .
 
     A directory ``mydatabase`` with subdirectory ``mytable``.
 
-    will be created, containing further subdirectories numbered 1, 2 and 3
-    (based on job id's in the DB). These directories are the working
-    directories of each job. They contain a copy of the stdout and stderr of
-    the job, along with copies of the jobman state (dictionaries in .conf
+    will be created, containing further subdirectories numbered 1, 2 and 3 
+    (based on job id's in the DB). These directories are the working 
+    directories of each job. They contain a copy of the stdout and stderr of 
+    the job, along with copies of the jobman state (dictionaries in .conf 
     files) and further files created by the job.
 
-    Yet the content of those directories is not updated live during the job.
-    The job runs on a cluster node, and those files are first written to a
-    temporary directory on the node itself. Then, when calling channel.save()
-    or when the job finishes, they're rsync'ed over to the working directory
+    Yet the content of those directories is not updated live during the job. 
+    The job runs on a cluster node, and those files are first written to a 
+    temporary directory on the node itself. Then, when calling channel.save() 
+    or when the job finishes, they're rsync'ed over to the working directory 
     where they should be.
 
-    This is annoying since one can't see how the jobs are doing unless he
-    SSH'es into the cluster node and finds the temporary directory. To
-    alleviate this problem, the cachesync commands copies over the files to
-    the working directory whenever asked to, so it's easier to probe the
-    running jobs state.
+    This is annoying since one can't see how the jobs are doing unless he 
+    SSH'es into the cluster node and finds the temporary directory. To 
+    alleviate this problem, the cachesync commands copies over the files to 
+    the working directory whenever asked to, so it's easier to probe the 
+    running jobs state. 
     """
     force = options.force
     multiple = options.multiple
     dbdesc = options.sql
     all_jobs = None
     if dbdesc:
-        import api0
+        from . import api0
         db = api0.open_db(dbdesc, serial=True)
 
         try:
@@ -352,27 +338,28 @@ def cachesync_runner(options, dir):
             except:
                 pass
 
+
     if multiple:
         sync_all_directories(dir, all_jobs, force)
     else:
         sync_single_directory(dir, all_jobs, force)
-
 
 ################################################################################
 ### register the command
 ################################################################################
 
 cachesync_parser = OptionParser(
-    usage='%prog cachesync [options] <path_to_job(s)_workingdir(s)>',
+    usage = '%prog cachesync [options] <path_to_job(s)_workingdir(s)>',
     add_help_option=False)
-cachesync_parser.add_option('-f', '--force', dest='force', default=False, action='store_true',
-                            help='force rsync even if the job is complete')
-cachesync_parser.add_option('-m', '--multiple', dest='multiple', default=False, action='store_true',
-                            help='sync multiple jobs (in that case, "path_to_job" must be the directory that contains all the jobs, i.e. its subdirectories are 1, 2, 3...)')
-cachesync_parser.add_option('', '--sql', dest='sql', default="", action='store',
-                            help='The db to witch we want to sync with.')
+cachesync_parser.add_option('-f', '--force', dest = 'force', default = False, action='store_true',
+                              help = 'force rsync even if the job is complete')
+cachesync_parser.add_option('-m', '--multiple', dest = 'multiple', default = False, action='store_true',
+                               help = 'sync multiple jobs (in that case, "path_to_job" must be the directory that contains all the jobs, i.e. its subdirectories are 1, 2, 3...)')
+cachesync_parser.add_option('', '--sql', dest = 'sql', default = "", action='store',
+                               help = 'The db to witch we want to sync with.')
 
 runner_registry['cachesync'] = (cachesync_parser, cachesync_runner)
+
 
 ###############################################################################
 # Utility functions for testing (manual tests)
@@ -385,7 +372,6 @@ TEST2 = False
 TEST3 = False
 TEST3_t1 = None
 
-
 def manualtest_lockandwait_jobman_experiment(state, channel):
     # make sure the info is available to run "jobman cachesync ."
     channel.save()
@@ -395,7 +381,6 @@ def manualtest_lockandwait_jobman_experiment(state, channel):
 
     return channel.COMPLETE
 
-
 def manualtest_before_delete():
     global TEST3, TEST3_t1
     if TEST3:
@@ -404,12 +389,10 @@ def manualtest_before_delete():
         TEST3_t1 = time.time()
         time.sleep(30)
 
-
 def manualtest_will_delete():
     global TEST3, TEST3_t1
     if TEST3:
-        print("Total delay (should be > 60 secs) was ", time.time() - TEST3_t1)
-
+        print("Total delay (should be > 60 secs) was ", time.time()-TEST3_t1)
 
 def manualtest_will_save():
     global TEST1, MANUALTEST_SAVE_COUNT
@@ -419,25 +402,21 @@ def manualtest_will_save():
             print("Will wait 60 secs before save()ing")
             time.sleep(60)
 
-
 def manualtest_will_perform_sync():
     global TEST2, TEST3
     if TEST2 or TEST3:
         print("Test 2/3: will sleep in perform_sync, for 60 secs")
         time.sleep(60)
 
-
 def manualtest_inc_save_count():
     global MANUALTEST_SAVE_COUNT
     MANUALTEST_SAVE_COUNT += 1
-
 
 def manualtest_test1_helper1(channel):
     global TEST1
     if TEST1:
         print("will run save() for second time")
         channel.save()
-
 
 def manualtest_test2_helper1(channel):
     global TEST2
@@ -450,11 +429,10 @@ def manualtest_test2_helper1(channel):
             channel.save()
             time.sleep(5)
             time2 = time.time()
-            print("delay was ", time2 - time1)
-            if time2 - time1 > 20.0:
+            print("delay was ", time2-time1)
+            if time2-time1 > 20.0:
                 # means the cachesync was performed, waited for some time
                 break
-
 
 '''
 The reason I use manual tests is that it's much easier to run concurrency tests like these is that the test setup would be very complicated otherwise (need to insert jobs in db, get called back through 'jobman sql' etc.).
@@ -507,7 +485,7 @@ Now, the test cases:
         * the delay printed (see stdout file) should be more than 30, something ~70 secs
         * set TEST3 = False
 
-
+ 
     * TEST 4: we can't run cachesync while temporary directory is being deleted
         * TBD, not a very important case
 '''

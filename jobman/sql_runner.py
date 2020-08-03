@@ -1,6 +1,17 @@
-from __future__ import print_function    # (at top of module)
+""" WRITEME """
+from __future__ import with_statement
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
 
-from . import cachesync_runner
+from builtins import str
+from builtins import range
+try:
+    from . import sql
+    from .cachesync_runner import cachesync_lock
+    from . import cachesync_runner
+except:
+    pass
 
 import os
 import tempfile
@@ -11,12 +22,12 @@ import time
 import random
 import re
 from optparse import OptionParser
+
 from .tools import expand, flatten, resolve, UsageError
 from .runner import runner_registry
 from .channel import StandardChannel, JobError
 from . import parse
 from .sql import START, RUNNING, DONE, ERR_START, ERR_SYNC, ERR_RUN, CANCELED
-from . import sql
 from .api0 import open_db
 
 
@@ -80,7 +91,7 @@ class RSyncChannel(StandardChannel):
         keep_trying = True
         rsync_rval = 1  # some non-null value
 
-        with cachesync_runner.cachesync_lock(None, self.path):
+        with cachesync_lock(None, self.path):
             # Useful for manual tests; leave this there, just commented.
             #cachesync_runner.manualtest_will_save()
 
@@ -643,7 +654,7 @@ def runner_sql(options, dbdescr, exproot):
 
             # Useful for manual tests; leave this there, just commented.
             #cachesync_runner.manualtest_before_delete()
-            with cachesync_runner.cachesync_lock(None, workdir):
+            with cachesync_lock(None, workdir):
                 # Useful for manual tests; leave this there, just
                 #commented.  cachesync_runner.manualtest_will_delete()
 
@@ -709,19 +720,19 @@ runner_registry['sqlview'] = (parser_sqlview, runner_sqlview)
 
 def to_status_number(i):
     if i == 'START':
-        status = sql.START
+        status = START
     elif i == 'RUNNING':
-        status = sql.RUNNING
+        status = RUNNING
     elif i == 'DONE':
-        status = sql.DONE
+        status = DONE
     elif i == 'ERR_START':
-        status = sql.ERR_START
+        status = ERR_START
     elif i == 'ERR_SYNC':
-        status = sql.ERR_SYNC
+        status = ERR_SYNC
     elif i == 'ERR_RUN':
-        status = sql.ERR_RUN
+        status = ERR_RUN
     elif i == 'CANCELED':
-        status = sql.CANCELED
+        status = CANCELED
     else:
         try:
             status = int(i)
@@ -820,7 +831,7 @@ def runner_sqlstatus(options, dbdescr, *ids):
                 k, v = param.split('=')
                 if k == 'jobman.status':
                     q = q.filter_eq(k, to_status_number(v))
-                elif isinstance(j[k], str):
+                elif isinstance(j[k], (str, str)):
                     q = q.filter_eq(k, v)
                 elif isinstance(j[k], float):
                     q = q.filter_eq(k, float(v))

@@ -1,8 +1,13 @@
+from __future__ import print_function
+from __future__ import absolute_import
+from builtins import map
+from builtins import str
+from past.builtins import basestring
 import sys
 import os
 import re
 try:
-    import sql
+    from . import sql
 except:
     pass
 import copy
@@ -19,8 +24,6 @@ class DD(dict):
             return super(DD, self).__setstate__
         elif attr == '__slots__':
             return super(DD, self).__slots__
-        if not attr in dict(self):
-            return None
         return self[attr]
 #         if attr.startswith('__'):
 #             return super(DD, self).__getattr__(attr)
@@ -28,6 +31,7 @@ class DD(dict):
 #             return self[attr]
 #         except KeyError:
 #             raise AttributeError(attr)
+
     def __setattr__(self, attr, value):
         # Safety check to ensure consistent behavior with __getattr__.
         assert attr not in ('__getstate__', '__setstate__', '__slots__')
@@ -135,13 +139,13 @@ def flatten(obj):
         prevent_flatten = False
         if isinstance(obj, dict) and not isinstance(obj, DD):
             for k in obj.keys():
-                if not isinstance(k, str):
+                if not isinstance(k, basestring):
                     prevent_flatten = True
                     break
         # TODO: add numpy.floating, numpy.integer?
         if (prevent_flatten or
             # add numpy.ndarray
-            isinstance(obj, (str, int, float, list, tuple, set)) or
+            isinstance(obj, (str, str, int, float, list, tuple, set)) or
             obj in (True, False, None)):
             # We do not flatten these objects.
             d[prefix] = obj #convert(obj)
@@ -254,7 +258,7 @@ def format_help(topic):
 ### Helper functions operating on experiment directories
 ################################################################################
 
-from . import parse
+from jobman import parse
 def find_conf_files(cwd, fname='current.conf', recurse=True):
     """
     This generator will iterator from the given directory, and find all job

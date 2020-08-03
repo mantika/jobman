@@ -1,11 +1,15 @@
-from __future__ import print_function    # (at top of module)
-
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from __future__ import division
+from past.utils import old_div
 from subprocess import Popen, PIPE
 import os
 import re
 import time
 from optparse import OptionParser
-import sql
+
+from . import sql
 from .runner import runner_registry
 from .tools import UsageError
 from .api0 import open_db
@@ -15,9 +19,9 @@ parse_check = OptionParser(usage='%prog check <tablepath> ',
 
 
 def str_time(run_time):
-    run_time = "%dd %dh%dm%ds" % (run_time / (24 * 3600),
-                                  run_time % (24 * 3600) / 3600,
-                                  run_time % 3600 / 60,
+    run_time = "%dd %dh%dm%ds" % (old_div(run_time, (24 * 3600)),
+                                  old_div(run_time % (24 * 3600), 3600),
+                                  old_div(run_time % 3600, 60),
                                   run_time % 60)
     return run_time
 
@@ -30,9 +34,9 @@ def check_running_pbs_jobs(r, now):
     out = p.stdout.read()
 
     if len(out) == 0:
-        print(("E: Job %d marked as PBS job '%s',"
+        print ("E: Job %d marked as PBS job '%s',"
                " but 'qstat' don't know it." % (
-                  r.id, r['jobman.sql.pbs_task_id'])))
+                  r.id, r['jobman.sql.pbs_task_id']))
         return
 
     run_time = str_time(now - r["jobman.sql.start_time"])
@@ -48,9 +52,9 @@ def check_running_pbs_jobs(r, now):
                 int(walltime_str[3:5]) * 60 +
                 int(walltime_str[-2:]))
     if now - int(r["jobman.sql.start_time"]) > walltime:
-        print(("W: Job %d is running for more then the specified"
+        print ("W: Job %d is running for more then the specified"
                " max time of %s. Run time %s" % (
-                   r.id, walltime_str, run_time)))
+                   r.id, walltime_str, run_time))
 
     # check state
     #<job_state>R</job_state>
@@ -58,16 +62,16 @@ def check_running_pbs_jobs(r, now):
     if state_str == "R":
         pass
     elif state_str == "Q":
-        print(("E: Job %d is running in the db on pbs with job id %s, but it"
+        print ("E: Job %d is running in the db on pbs with job id %s, but it"
                " is in the pbs queue. Run time %s" % (
-                  r.id, r["jobman.sql.pbs_task_id"], run_time)))
+                  r.id, r["jobman.sql.pbs_task_id"], run_time))
     elif state_str == "C":
-        print(("W: Job %d is running in the db, but it is marked as completed"
+        print ("W: Job %d is running in the db, but it is marked as completed"
                " in the pbs queue. This can be synchonization issue. Retry in"
-               " 1 minutes. Run time %s." % (r.id, run_time)))
+               " 1 minutes. Run time %s." % (r.id, run_time))
     else:
-        print(("W: Job %d is running in the db, but we don't understand the"
-               " state in the queue '%s'" % (r.id, state_str)))
+        print ("W: Job %d is running in the db, but we don't understand the"
+               " state in the queue '%s'" % (r.id, state_str))
 
 
 def check_running_sge_jobs(r, now):
@@ -147,12 +151,12 @@ def check_serve(options, dbdescr):
         canceled = q.filter_eq('jobman.status', -1).all()
         info = []
 
-        print(("I: number of job by status (%d:START, %d:RUNNING, %d:DONE,"
+        print ("I: number of job by status (%d:START, %d:RUNNING, %d:DONE,"
                " %d:ERR_START, %d:ERR_SYNC, %d:ERR_RUN, %d:CANCELED)"
                " in the db (%d:TOTAL)" % (len(idle), len(running),
                                           len(finished), len(err_start),
                                           len(err_sync), len(err_run),
-                                          len(canceled), len(q.all()))))
+                                          len(canceled), len(q.all())))
         print()
 
         #warn about job in error status

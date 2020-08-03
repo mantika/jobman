@@ -1,5 +1,9 @@
+from __future__ import print_function
+from __future__ import unicode_literals
 #This file contain example experiment and in the futur some generic
 #experiment(for example for PLearn)
+from builtins import str
+from builtins import range
 import sys
 import time
 

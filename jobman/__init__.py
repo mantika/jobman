@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
 import sys
 
 from . import runner
@@ -8,7 +10,7 @@ if not sys.version.startswith('2.4.'):
     from . import sql_runner
 
 try:
-    import cachesync_runner
+    from . import cachesync_runner
 except:
     pass
 
