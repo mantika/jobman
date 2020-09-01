@@ -159,7 +159,8 @@ class DBRSyncChannel(RSyncChannel):
 
     def __init__(self, db, path, remote_root,
                  redirect_stdout=False, redirect_stderr=False,
-                 finish_up_after=None, save_interval=None):
+                 finish_up_after=None, save_interval=None,
+                 module_path=None):
 
         self.db = db
 
@@ -177,7 +178,11 @@ class DBRSyncChannel(RSyncChannel):
             state["jobman.id"] = self.dbstate.id
             if "dbdict" in state:
                 state.jobman = state.dbdict
-            experiment = resolve(state.jobman.experiment)
+            experiment = state.jobman.experiment
+            if module_path:
+                experiment = '{}.{}'.format(module_path, experiment)
+
+            experiment = resolve(experiment)
             remote_path = os.path.join(remote_root, self.db.dbname,
                                        self.db.tablename, str(self.dbstate.id))
             super(DBRSyncChannel, self).__init__(path, remote_path,
@@ -586,6 +591,9 @@ parser_sql.add_option('--workdir-dir', action='store',
 parser_sql.add_option('--import', action='store',
                       dest='modules', default=None,
                       help='Modules to be loaded before the experiment begins')
+parser_sql.add_option('--module-path', action='store',
+                      dest='module_path', default=None,
+                      help='module path for importing the experiment')
 
 
 def runner_sql(options, dbdescr, exproot):
@@ -648,7 +656,8 @@ def runner_sql(options, dbdescr, exproot):
                                      redirect_stdout=True,
                                      redirect_stderr=True,
                                      finish_up_after=options.finish_up_after or None,
-                                     save_interval = options.save_every or None
+                                     save_interval=options.save_every or None,
+                                     module_path=options.module_path
                                      )
             channel.run()
 

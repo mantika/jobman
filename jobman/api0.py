@@ -4,7 +4,9 @@ This file defines class `DbHandle` and a few routines for creating instances of 
 """
 from __future__ import print_function
 from __future__ import unicode_literals
-
+import time
+import random
+import os
 from builtins import str
 from builtins import object
 from jobman import sql
@@ -12,13 +14,13 @@ from jobman import sql
 if sql.sqlalchemy_ok:
     import sqlalchemy.pool
 
-    from sqlalchemy import create_engine#, desc
+    from sqlalchemy import create_engine  # , desc
     from sqlalchemy import (
-            Table, Column, MetaData, ForeignKeyConstraint #ForeignKey,
-            )
+        Table, Column, MetaData, ForeignKeyConstraint  # ForeignKey,
+    )
     from sqlalchemy import (
-        Integer, String, Float, DateTime, Text, Binary #Boolean,
-        )
+        Integer, String, Float, DateTime, Text, Binary  # Boolean,
+    )
     try:
         from sqlalchemy import BigInteger
     except ImportError:
@@ -26,28 +28,26 @@ if sql.sqlalchemy_ok:
         from sqlalchemy.databases.postgres import PGBigInteger as BigInteger
 
     from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.orm import mapper, relation, eagerload#backref
+    from sqlalchemy.orm import mapper, relation, eagerload  # backref
 
-    #from sqlalchemy.engine.base import Connection
+    # from sqlalchemy.engine.base import Connection
 
-    from sqlalchemy.sql import select #operators
-    from sqlalchemy.sql.expression import column, not_, literal_column #outerjoin
+    from sqlalchemy.sql import select  # operators
+    from sqlalchemy.sql.expression import column, not_, literal_column  # outerjoin
 
     from sqlalchemy.engine.url import make_url
 
 else:
     from jobman import fake_sqlalchemy as sqlalchemy
 
-import time
-import random
-import os
 
 class Todo(Exception):
     # Here 'this' refers to the code where the exception is raised,
     # not the code of the 'Todo' exception itself!
     """Replace this with some working code!"""
 
-class DbHandle (object):
+
+class DbHandle(object):
     """
     This class implements a persistant dictionary using an SQL database as storage.
 
@@ -103,12 +103,12 @@ class DbHandle (object):
     e_bad_table = 'incompatible columns in table'
 
     def __init__(h_self, Session, engine, dict_table, pair_table):
-        h_self._engine = engine;
+        h_self._engine = engine
         h_self._dict_table = dict_table
         h_self._pair_table = pair_table
 
-        #TODO: replace this crude algorithm (ticket #17)
-        if ['id', 'create', 'write', 'read', 'status', 'priority','hash'] != [c.name for c in dict_table.c]:
+        # TODO: replace this crude algorithm (ticket #17)
+        if ['id', 'create', 'write', 'read', 'status', 'priority', 'hash'] != [c.name for c in dict_table.c]:
             raise ValueError(h_self.e_bad_table, dict_table)
         if ['id', 'dict_id', 'name', 'type', 'ival', 'fval', 'sval', 'bval'] != [c.name for c in pair_table.c]:
             raise ValueError(h_self.e_bad_table, pair_table)
@@ -123,8 +123,10 @@ class DbHandle (object):
             def __init__(k_self, name, val):
                 k_self.name = name
                 k_self.val = val
+
             def __repr__(k_self):
                 return "<Param(%s,'%s', %s)>" % (k_self.id, k_self.name, repr(k_self.val))
+
             def __get_val(k_self):
                 val = None
                 if k_self.type == 'i':
@@ -135,12 +137,12 @@ class DbHandle (object):
                     else:
                         val = float(k_self.fval)
                 elif k_self.type == 'b':
-                    val = eval(str(k_self.bval))
+                    val = eval(bytes(k_self.bval))
                 elif k_self.type == 's':
                     val = k_self.sval
                 else:
                     raise ValueError('Incompatible value in column "type"',
-                            k_self.type)
+                                     k_self.type)
                 return val
 
             def __set_val(k_self, val):
@@ -149,7 +151,7 @@ class DbHandle (object):
                 k_self.bval = None
                 k_self.sval = None
 
-                if isinstance(val, (str,str)):
+                if isinstance(val, str):
                     k_self.type = 's'
                     k_self.sval = val
                 elif isinstance(val, float):
@@ -166,7 +168,11 @@ class DbHandle (object):
                     k_self.ival = int(val)
                 else:
                     k_self.type = 'b'
-                    k_self.bval = repr(val)
+                    bval = repr(val)
+                    if isinstance(bval, str):
+                        bval = bval.encode()
+
+                    k_self.bval = bval
                     assert eval(k_self.bval) == val
 
             val = property(__get_val, __set_val)
@@ -187,9 +193,9 @@ class DbHandle (object):
             def __init__(d_self, session=None):
                 if session is None:
                     s = h_self._session_fn()
-                    s.add(d_self) #d_self transient -> pending
-                    s.commit()    #d_self -> persistent
-                    s.close()     #d_self -> detached
+                    s.add(d_self)  # d_self transient -> pending
+                    s.commit()  # d_self -> persistent
+                    s.close()  # d_self -> detached
                 else:
                     s = session
                     s.add(d_self)
@@ -208,6 +214,7 @@ class DbHandle (object):
 
             def __eq__(self, other):
                 return dict(self) == dict(other)
+
             def __neq__(self, other):
                 return dict(self) != dict(other)
 
@@ -238,12 +245,12 @@ class DbHandle (object):
                     commit_close = False
                 s.add(d_self)
 
-                #find the item to delete in d_self._attrs
+                # find the item to delete in d_self._attrs
                 to_del = None
-                for i,a in enumerate(d_self._attrs):
+                for i, a in enumerate(d_self._attrs):
                     if a.name == key:
                         assert to_del is None
-                        to_del = (i,a)
+                        to_del = (i, a)
                 if to_del is None:
                     raise KeyError(key)
                 else:
@@ -321,7 +328,8 @@ class DbHandle (object):
                 """
                 session = h_self._session_fn()
                 if ('session' in kwargs):
-                    raise Exception('"session" is no longer a kwarg to update, use update_in_session or update_simple instead')
+                    raise Exception(
+                        '"session" is no longer a kwarg to update, use update_in_session or update_simple instead')
 
                 while True:
                     # now we have a fresh session, and we try to do our work
@@ -330,7 +338,7 @@ class DbHandle (object):
                         session.commit()
                         break
                     except Exception:
-                        #Commonly, an exception will come from sqlalchemy or psycopg2.
+                        # Commonly, an exception will come from sqlalchemy or psycopg2.
                         # I don't want to hard-code psycopg2 into this file
                         # because other backends will raise different errors.
                         #
@@ -352,7 +360,7 @@ class DbHandle (object):
                     return default
 
             def __str__(self):
-                return 'Dict'+ str(dict(self))
+                return 'Dict' + str(dict(self))
 
             #
             # database stuff
@@ -366,12 +374,12 @@ class DbHandle (object):
                 """
                 if session is None:
                     session = h_self._session_fn()
-                    session.add(d_self) #so session knows about us
+                    session.add(d_self)  # so session knows about us
                     session.refresh(d_self)
                     session.commit()
                     session.close()
                 else:
-                    session.add(d_self) #so session knows about us
+                    session.add(d_self)  # so session knows about us
                     session.refresh(self.dbrow)
 
             def delete(d_self, session=None):
@@ -381,19 +389,19 @@ class DbHandle (object):
                 """
                 if session is None:
                     session = h_self._session_fn()
-                    session.add(d_self) #so session knows about us
-                    session.delete(d_self) #mark for deletion
+                    session.add(d_self)  # so session knows about us
+                    session.delete(d_self)  # mark for deletion
                     session.commit()
                     session.close()
                 else:
-                    session.add(d_self) #so session knows about us
+                    session.add(d_self)  # so session knows about us
                     session.delete(d_self)
 
             # helper routine by update() and __setitem__
             def _set_in_session(d_self, key, val, session):
                 """Modify an existing key or create a key to hold val"""
 
-                #FIRST SOME MIRRORING HACKS
+                # FIRST SOME MIRRORING HACKS
                 if key == 'jobman.id':
                     ival = int(val)
                     d_self.id = ival
@@ -409,10 +417,11 @@ class DbHandle (object):
 
                 if key in d_self._forbidden_keys:
                     raise KeyError(key)
+
                 created = None
-                for i,a in enumerate(d_self._attrs):
+                for i, a in enumerate(d_self._attrs):
                     if a.name == key:
-                        assert created == None
+                        assert created is None
                         created = h_self._KeyVal(key, val)
                         d_self._attrs[i] = created
                 if not created:
@@ -421,10 +430,10 @@ class DbHandle (object):
                 session.add(created)
 
         mapper(Dict, dict_table,
-                properties = {
-                    '_attrs': relation(KeyVal,
-                        cascade="all, delete-orphan")
-                    })
+               properties={
+                   '_attrs': relation(KeyVal,
+                                      cascade="all, delete-orphan")
+               })
 
         class _Query (object):
             """
@@ -445,24 +454,28 @@ class DbHandle (object):
                 """Return a Query object that restricts to dictionaries containing
                 the given kwargs"""
 
-                #Note: when we add new types to the key columns, add them here
+                # Note: when we add new types to the key columns, add them here
                 q = q_self._query
                 T = h_self._Dict
-                if isinstance(arg, (str,str)):
+                if isinstance(arg, (str, str)):
                     q = q.filter(T._attrs.any(name=kw, sval=arg))
                 elif isinstance(arg, float):
                     q = q.filter(T._attrs.any(name=kw, fval=arg))
                 elif isinstance(arg, int):
                     q = q.filter(T._attrs.any(name=kw, ival=arg))
                 else:
-                    q = q.filter(T._attrs.any(name=kw, bval=repr(arg)))
+                    bval = repr(arg)
+                    if isinstance(bval, str):
+                        bval = bval.encode()
+
+                    q = q.filter(T._attrs.any(name=kw, bval=bval))
 
                 return h_self._Query(q)
 
             def filter_eq_dct(q_self, dct):
                 rval = q_self
                 for key, val in list(dct.items()):
-                    rval = rval.filter_eq(key,val)
+                    rval = rval.filter_eq(key, val)
                 return rval
 
             def filter_missing(q_self, kw):
@@ -521,7 +534,7 @@ class DbHandle (object):
                 else:
                     val_results = [(d[key], d) for d in results]
 
-                val_results.sort() #interesting: there is an optional key parameter
+                val_results.sort()  # interesting: there is an optional key parameter
                 if desc:
                     val_results.reverse()
                 return [vr[-1] for vr in val_results]
@@ -566,22 +579,24 @@ class DbHandle (object):
         if session is None:
             s = h_self.session()
             rval = h_self._Dict(s)
-            if dct: rval.update_simple(dct, session=s)
+            if dct:
+                rval.update_simple(dct, session=s)
             s.commit()
             s.close()
         else:
             rval = h_self._Dict(session)
-            if dct: rval.update_simple(dct, session=session)
+            if dct:
+                rval.update_simple(dct, session=session)
             session.commit()
         return rval
 
     def query(h_self, session):
         """Construct an SqlAlchemy query, which can be subsequently filtered
         using the instance methods of DbQuery"""
-        return h_self._Query(session.query(h_self._Dict)\
-                        .options(eagerload('_attrs')))
+        return h_self._Query(session.query(h_self._Dict)
+                             .options(eagerload('_attrs')))
 
-    def createView(h_self, viewname, verbose = True):
+    def createView(h_self, viewname, verbose=True):
 
         s = h_self.session()
         kv = h_self._KeyVal
@@ -609,23 +624,23 @@ class DbHandle (object):
                 val_type = String
             else:
                 raise ValueError('Incompatible value in column "type"',
-                        val_type_char)
+                                 val_type_char)
             val_type_string = val_type_char + 'val'
 
-            safe_name = name.replace('_','').replace('.','_')
+            safe_name = name.replace('_', '').replace('.', '_')
             if safe_name in safe_names:
                 safe_name += '_' + val_type_char
             safe_names.append(safe_name)
 
             cols.append(Column(safe_name, val_type))
-            #print 'name =', name, ', type =', type
+            # print 'name =', name, ', type =', type
 
             # SQL does not support binds in CREATE VIEW.
             # it just happened to work with psycopg2 because binds are
             # handled client-side.  Sqlite does it server-side.
             sub_query = select(
-                    [kv.dict_id, column(val_type_string).label(safe_name)],
-                    kv.name == literal_column("'%s'"%(name,)))
+                [kv.dict_id, column(val_type_string).label(safe_name)],
+                kv.name == literal_column("'%s'" % (name,)))
             sub_query = sub_query.alias(safe_name)
             sub_queries.append(sub_query)
 
@@ -633,11 +648,11 @@ class DbHandle (object):
         big_join = h_self._dict_table
         for sub_query in sub_queries:
             big_join = big_join.outerjoin(sub_query,
-                    sub_query.c.dict_id == d.id)
+                                          sub_query.c.dict_id == d.id)
 
         # Main "select" query, with the same information as the view
         main_query = select([d.id] + [column(name) for name in safe_names],
-                from_obj = big_join)
+                            from_obj=big_join)
         main_query = main_query.compile()
         quoted_params = {}
         for (key, val) in list(main_query.params.items()):
@@ -647,13 +662,13 @@ class DbHandle (object):
         # Finally, the view creation command
         # Do not add 'OR REPLACE', it will break sqlite
         create_view_sql = 'CREATE VIEW %s AS %s'\
-                % (viewname, main_query_sql)
+            % (viewname, main_query_sql)
         if verbose:
             print('Creating sql view with command:\n', create_view_sql)
 
         # Execution
-        h_self._engine.execute(drop_view_sql);
-        h_self._engine.execute(create_view_sql);
+        h_self._engine.execute(drop_view_sql)
+        h_self._engine.execute(create_view_sql)
 
         s.commit()
         s.close()
@@ -667,18 +682,18 @@ class DbHandle (object):
 
         return MappedView
 
-    def dropView(h_self, viewname, verbose = True):
+    def dropView(h_self, viewname, verbose=True):
 
         s = h_self.session()
         kv = h_self._KeyVal
         d = h_self._Dict
 
-        drop_view_sql = 'DROP VIEW %s'%(viewname)
+        drop_view_sql = 'DROP VIEW %s' % (viewname)
         if verbose:
             print('Deleting sql view with command:\n', drop_view_sql)
 
         # Execution
-        h_self._engine.execute(drop_view_sql);
+        h_self._engine.execute(drop_view_sql)
 
         s.commit()
         s.close()
@@ -690,7 +705,7 @@ class DbHandle (object):
         s = h_self.session()
         rval = s.query(h_self._Dict).get(id)
         if rval:
-            #eagerload hack
+            # eagerload hack
             str(rval)
             rval.id
         s.close()
@@ -698,10 +713,10 @@ class DbHandle (object):
 
 
 def db_from_engine(engine,
-        dbname,
-        table_prefix='DbHandle_default_',
-        trial_suffix='trial',
-        keyval_suffix='keyval'):
+                   dbname,
+                   table_prefix='DbHandle_default_',
+                   trial_suffix='trial',
+                   keyval_suffix='keyval'):
     """Create a DbHandle instance
 
     @type engine: sqlalchemy engine (e.g. from create_engine)
@@ -719,41 +734,42 @@ def db_from_engine(engine,
      - I{table_prefix + keyval_suffix}
 
     """
-    Session = sessionmaker(autoflush=True)#, autocommit=False)
+    Session = sessionmaker(autoflush=True)  # , autocommit=False)
 
     metadata = MetaData()
 
     t_trial = Table(table_prefix+trial_suffix, metadata,
-            Column('id', Integer, primary_key=True),
-            Column('create', DateTime),
-            Column('write', DateTime),
-            Column('read', DateTime),
-            Column('status', Integer),
-            Column('priority', Float(53)),
-            Column('hash', BigInteger))
+                    Column('id', Integer, primary_key=True),
+                    Column('create', DateTime),
+                    Column('write', DateTime),
+                    Column('read', DateTime),
+                    Column('status', Integer),
+                    Column('priority', Float(53)),
+                    Column('hash', BigInteger))
 
     t_keyval = Table(table_prefix+keyval_suffix, metadata,
-            Column('id', Integer, primary_key=True),
-            Column('dict_id', Integer, index=True),
-            Column('name', String(128), index=True, nullable=False), #name of attribute
-            Column('type', String(1)),
-            #Column('ntype', Boolean),
-            Column('ival', BigInteger),
-            Column('fval', Float(53)),
-            Column('sval', Text),
-            Column('bval', Binary),
-            ForeignKeyConstraint(['dict_id'], [table_prefix+trial_suffix+'.id']))
+                     Column('id', Integer, primary_key=True),
+                     Column('dict_id', Integer, index=True),
+                     Column('name', String(128), index=True, nullable=False),  # name of attribute
+                     Column('type', String(1)),
+                     #Column('ntype', Boolean),
+                     Column('ival', BigInteger),
+                     Column('fval', Float(53)),
+                     Column('sval', Text),
+                     Column('bval', Binary),
+                     ForeignKeyConstraint(['dict_id'], [table_prefix+trial_suffix+'.id']))
 
-                #, ForeignKey('%s.id' % t_trial)),
+    # , ForeignKey('%s.id' % t_trial)),
     metadata.bind = engine
-    metadata.create_all() # no-op when tables already exist
-    #warning: tables can exist, but have incorrect schema
+    metadata.create_all()  # no-op when tables already exist
+    # warning: tables can exist, but have incorrect schema
     # see bug mentioned in DbHandle constructor
 
     db = DbHandle(Session, engine, t_trial, t_keyval)
     db.tablename = table_prefix
     db.dbname = dbname
     return db
+
 
 def get_password(hostname, dbname):
     """Return the current user's password for a given database
@@ -765,12 +781,13 @@ def get_password(hostname, dbname):
            passwords for that database type (for instance, .pgpass for
            postgres)
     """
-    password_path = os.getenv('HOME')+'/.jobman_%s'%dbname
+    password_path = os.getenv('HOME')+'/.jobman_%s' % dbname
     if os.path.isfile(password_path):
         password = open(password_path).readline().rstrip('\r\n')
     else:
         password = ''
     return password
+
 
 def parse_dbstring(dbstring):
     """Unpacks a dbstring of the form postgres://username[:password]@hostname[:
@@ -806,6 +823,7 @@ port]/dbname?table=tablename
 
     return url
 
+
 def open_db(dbstr, echo=False, serial=False, poolclass=sqlalchemy.pool.NullPool, **kwargs):
     """Create an engine to access a DbHandle.
     """
@@ -818,16 +836,16 @@ def open_db(dbstr, echo=False, serial=False, poolclass=sqlalchemy.pool.NullPool,
 
     if serial:
         if sqlalchemy.__version__ >= '0.6':
-            engine = create_engine(url, echo=echo, poolclass=poolclass, isolation_level = 'SERIALIZABLE')
+            engine = create_engine(url, echo=echo, poolclass=poolclass, isolation_level='SERIALIZABLE')
         else:
             import psycopg2.extensions
+
             def connect():
-                c = psycopg2.connect(user=url.username, password=url.password, database=url.database, host=url.host)#, port=url.port)
+                c = psycopg2.connect(user=url.username, password=url.password,
+                                     database=url.database, host=url.host)  # , port=url.port)
                 c.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE)
                 return c
-            engine = create_engine('postgres://'
-                                   ,creator=connect
-                                   ,poolclass=poolclass
+            engine = create_engine('postgres://', creator=connect, poolclass=poolclass
                                    )
 
     else:

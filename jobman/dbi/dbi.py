@@ -17,16 +17,7 @@ import traceback
 from utils import (get_condor_platform, get_config_value, get_jobmandir,
                    get_new_sid, set_config_value, truncate)
 
-try:
-    from random import shuffle
-except ImportError:
-    import whrandom
-
-    def shuffle(list):
-        l = len(list)
-        for i in range(0, l - 1):
-            j = whrandom.randint(i + 1, l - 1)
-            list[i], list[j] = list[j], list[i]
+from random import shuffle
 
 STATUS_FINISHED = 0
 STATUS_RUNNING = 1
