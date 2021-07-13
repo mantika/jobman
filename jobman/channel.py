@@ -151,7 +151,7 @@ class SingleChannel(Channel):
             self.feedback = None
             return feedback
 
-    def run(self, force = False):
+    def run(self, force=False):
         self.setup()
 
         status = self.state.jobman.get('status', self.START)
@@ -166,28 +166,26 @@ class SingleChannel(Channel):
 
         v = self.ERR_RUN
 
-        # Python 2.4 compatibility: do not use `with` statement.
-        self.__enter__()
-        try:
+        with self:
             try:
-                v = self.experiment(self.state, self)
-            except Exception:
-                # The exception info will be passed to the __exit__ method
-                # which will raise it.
-                pass
-        finally:
-            print("The experiment returned value is",v)
-            if self.state.jobman.status is self.CANCELED:
-                if v is self.COMPLETE:
+                try:
+                    v = self.experiment(self.state, self)
+                except Exception:
+                    # The exception info will be passed to the __exit__ method
+                    # which will raise it.
+                    pass
+            finally:
+                print("The experiment returned value is", v)
+                if self.state.jobman.status is self.CANCELED:
+                    if v is self.COMPLETE:
+                        self.state.jobman.status = self.DONE
+                    # else we don't change the status
+                elif v is self.COMPLETE:
                     self.state.jobman.status = self.DONE
-                #else we don't change the status
-            elif v is self.COMPLETE:
-                self.state.jobman.status = self.DONE
-            elif v is self.INCOMPLETE:
-                self.state.jobman.status = self.START
-            else:
-                self.state.jobman.status = self.ERR_RUN
-        self.__exit__(*sys.exc_info())
+                elif v is self.INCOMPLETE:
+                    self.state.jobman.status = self.START
+                else:
+                    self.state.jobman.status = self.ERR_RUN
 
         return v
 
