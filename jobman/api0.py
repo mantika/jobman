@@ -738,7 +738,7 @@ def db_from_engine(engine,
 
     metadata = MetaData()
 
-    t_trial = Table(table_prefix+trial_suffix, metadata,
+    t_trial = Table(table_prefix + trial_suffix, metadata,
                     Column('id', Integer, primary_key=True),
                     Column('create', DateTime),
                     Column('write', DateTime),
@@ -747,17 +747,17 @@ def db_from_engine(engine,
                     Column('priority', Float(53)),
                     Column('hash', BigInteger))
 
-    t_keyval = Table(table_prefix+keyval_suffix, metadata,
+    t_keyval = Table(table_prefix + keyval_suffix, metadata,
                      Column('id', Integer, primary_key=True),
                      Column('dict_id', Integer, index=True),
                      Column('name', String(128), index=True, nullable=False),  # name of attribute
                      Column('type', String(1)),
-                     #Column('ntype', Boolean),
+                     # Column('ntype', Boolean),
                      Column('ival', BigInteger),
                      Column('fval', Float(53)),
                      Column('sval', Text),
                      Column('bval', Binary),
-                     ForeignKeyConstraint(['dict_id'], [table_prefix+trial_suffix+'.id']))
+                     ForeignKeyConstraint(['dict_id'], [table_prefix + trial_suffix + '.id'], ondelete='CASCADE'))
 
     # , ForeignKey('%s.id' % t_trial)),
     metadata.bind = engine

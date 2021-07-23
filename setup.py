@@ -5,15 +5,15 @@
 #   * Add back in installation requirements
 #   * Add download_url
 
-#To enable "python setup.py develop --prefix=~/.local"
-#We need to import setuptools
+# To enable "python setup.py develop --prefix=~/.local"
+# We need to import setuptools
 try:
     from setuptools import setup
 except ImportError:
     from distutils.core import setup
 
 setup(name='Jobman',
-      version='1.0.0',
+      version='1.0.1',
       description=('Facilitate handling of many jobs'
                    '(especially jobs send on cluster)'),
       license='3-clause BSD',
