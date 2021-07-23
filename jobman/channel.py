@@ -168,12 +168,7 @@ class SingleChannel(Channel):
 
         with self:
             try:
-                try:
-                    v = self.experiment(self.state, self)
-                except Exception:
-                    # The exception info will be passed to the __exit__ method
-                    # which will raise it.
-                    pass
+                v = self.experiment(self.state, self)
             finally:
                 print("The experiment returned value is", v)
                 if self.state.jobman.status is self.CANCELED:
@@ -200,9 +195,11 @@ class SingleChannel(Channel):
         if self.catch_sigterm:
             self.prev_sigterm = signal.getsignal(signal.SIGTERM)
             signal.signal(signal.SIGTERM, self.on_sigterm)
+
         if self.catch_sigint:
             self.prev_sigint = signal.getsignal(signal.SIGINT)
             signal.signal(signal.SIGINT, self.on_sigterm)
+
         if self.catch_sigusr2:
             self.prev_sigusr2 = signal.getsignal(signal.SIGUSR2)
             signal.signal(signal.SIGUSR2, self.on_sigterm)
@@ -213,27 +210,29 @@ class SingleChannel(Channel):
         self.save()
         return self
 
-    def __exit__(self, type, value, tb_traceback, save = True):
-        if type:
-            try:
-                raise_(type, value, tb_traceback)
-            except:
-                traceback.print_exc()
+    def __exit__(self, type_, value, tb_traceback, save=True):
+        if type_:
+            traceback.print_exception(type_, value, tb_traceback)
+
         if self.catch_sigterm:
             signal.signal(signal.SIGTERM, self.prev_sigterm)
             self.prev_sigterm = None
+
         if self.catch_sigint:
             signal.signal(signal.SIGINT, self.prev_sigint)
             self.prev_sigint = None
+
         if self.catch_sigusr2:
             signal.signal(signal.SIGUSR2, self.prev_sigusr2)
             self.prev_sigusr2 = None
-        #This fct is called multiple time. We want to record the time only when the jobs finish.
-        if hasattr(self.state.jobman,'status') and self.state.jobman.status == 2:
+
+        # This fct is called multiple time. We want to record the time only when the jobs finish.
+        if hasattr(self.state.jobman, 'status') and self.state.jobman.status == 2:
             self.state.jobman.end_time = time.time()
             self.state.jobman.run_time = self.state.jobman.end_time - self.state.jobman.start_time
         if save:
             self.save()
+
         return True
 
 
