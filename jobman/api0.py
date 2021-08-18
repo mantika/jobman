@@ -4,6 +4,7 @@ This file defines class `DbHandle` and a few routines for creating instances of 
 """
 from __future__ import print_function
 from __future__ import unicode_literals
+import logging
 import time
 import random
 import os
@@ -246,17 +247,21 @@ class DbHandle(object):
                 s.add(d_self)
 
                 # find the item to delete in d_self._attrs
-                to_del = None
+                to_del = []
                 for i, a in enumerate(d_self._attrs):
                     if a.name == key:
-                        assert to_del is None
-                        to_del = (i, a)
-                if to_del is None:
+                        # assert to_del is None
+                        to_del.append((i, a))
+
+                if not to_del:
                     raise KeyError(key)
-                else:
-                    i, a = to_del
+
+                removed = 0
+                for i, a in to_del:
                     s.delete(a)
-                    del d_self._attrs[i]
+                    del d_self._attrs[i - removed]
+                    removed += 1
+
                 if commit_close:
                     s.commit()
                     s.close()
@@ -316,10 +321,10 @@ class DbHandle(object):
                         session.commit()
                         break
                     except Exception:
+                        session.rollback()
                         _recommit_times -= 1
                         if _recommit_times:
                             time.sleep(random.randint(1, _recommit_waitsecs))
-                            session.rollback()
                         else:
                             raise
 
@@ -344,10 +349,10 @@ class DbHandle(object):
                         #
                         # An exception that doesn't go away on subsequent tries
                         # will be raised eventually in the else-clause below.
+                        session.rollback()
                         _recommit_times -= 1
                         if _recommit_times:
                             time.sleep(random.randint(1, _recommit_waitsecs))
-                            session.rollback()
                         else:
                             session.close()
                             raise
@@ -380,7 +385,7 @@ class DbHandle(object):
                     session.close()
                 else:
                     session.add(d_self)  # so session knows about us
-                    session.refresh(self.dbrow)
+                    session.refresh(d_self.dbrow)
 
             def delete(d_self, session=None):
                 """Delete this dictionary from the database
@@ -419,14 +424,25 @@ class DbHandle(object):
                     raise KeyError(key)
 
                 created = None
+                duplicate = False
                 for i, a in enumerate(d_self._attrs):
                     if a.name == key:
-                        assert created is None
+                        if created is not None:
+                            logging.warning('{} already created, possible duplicate?'.format(key))
+                            duplicate = True
+                            created = None
+                            break
+
                         created = h_self._KeyVal(key, val)
                         d_self._attrs[i] = created
+
+                if duplicate:
+                    d_self.__delitem__(key, session)
+
                 if not created:
                     created = h_self._KeyVal(key, val)
                     d_self._attrs.append(created)
+
                 session.add(created)
 
         mapper(Dict, dict_table,
@@ -790,8 +806,7 @@ def get_password(hostname, dbname):
 
 
 def parse_dbstring(dbstring):
-    """Unpacks a dbstring of the form postgres://username[:password]@hostname[:
-port]/dbname?table=tablename
+    """Unpacks a dbstring of the form postgres://username[:password]@hostname[:port]/dbname?table=tablename
 
     :rtype: tuple of strings
     :returns: username, password, hostname, port, dbname, tablename
