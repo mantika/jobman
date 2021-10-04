@@ -24,7 +24,11 @@ class DD(dict):
             return super(DD, self).__setstate__
         elif attr == '__slots__':
             return super(DD, self).__slots__
-        return self[attr]
+
+        try:
+            return self[attr]
+        except KeyError:
+            raise AttributeError(attr)
 #         if attr.startswith('__'):
 #             return super(DD, self).__getattr__(attr)
 #         try:
