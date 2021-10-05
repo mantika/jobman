@@ -215,15 +215,27 @@ class SingleChannel(Channel):
             traceback.print_exception(type_, value, tb_traceback)
 
         if self.catch_sigterm:
-            signal.signal(signal.SIGTERM, self.prev_sigterm)
+            if self.prev_sigterm is not None:
+                signal.signal(signal.SIGTERM, self.prev_sigterm)
+            else:
+                signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
             self.prev_sigterm = None
 
         if self.catch_sigint:
-            signal.signal(signal.SIGINT, self.prev_sigint)
+            if self.prev_sigint is not None:
+                signal.signal(signal.SIGINT, self.prev_sigint)
+            else:
+                signal.signal(signal.SIGINT, signal.SIG_DFL)
+
             self.prev_sigint = None
 
         if self.catch_sigusr2:
-            signal.signal(signal.SIGUSR2, self.prev_sigusr2)
+            if self.prev_sigusr2 is not None:
+                signal.signal(signal.SIGUSR2, self.prev_sigusr2)
+            else:
+                signal.signal(signal.SIGUSR2, signal.SIG_DFL)
+
             self.prev_sigusr2 = None
 
         # This fct is called multiple time. We want to record the time only when the jobs finish.
