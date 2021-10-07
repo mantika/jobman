@@ -846,7 +846,7 @@ def open_db(dbstr, echo=False, serial=False, poolclass=sqlalchemy.pool.NullPool,
 
     tablename = url.query.pop('table')
     dbname = url.query.pop('dbname', None)
-    if dbname == None:
+    if dbname is None:
         dbname = url.database
 
     if serial:

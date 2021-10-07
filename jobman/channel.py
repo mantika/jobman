@@ -192,17 +192,20 @@ class SingleChannel(Channel):
     def __enter__(self):
         # install a SIGTERM handler that asks the experiment function to return
         # the next time it will call switch()
-        if self.catch_sigterm:
-            self.prev_sigterm = signal.getsignal(signal.SIGTERM)
-            signal.signal(signal.SIGTERM, self.on_sigterm)
+        try:
+            if self.catch_sigterm:
+                self.prev_sigterm = signal.getsignal(signal.SIGTERM)
+                signal.signal(signal.SIGTERM, self.on_sigterm)
 
-        if self.catch_sigint:
-            self.prev_sigint = signal.getsignal(signal.SIGINT)
-            signal.signal(signal.SIGINT, self.on_sigterm)
+            if self.catch_sigint:
+                self.prev_sigint = signal.getsignal(signal.SIGINT)
+                signal.signal(signal.SIGINT, self.on_sigterm)
 
-        if self.catch_sigusr2:
-            self.prev_sigusr2 = signal.getsignal(signal.SIGUSR2)
-            signal.signal(signal.SIGUSR2, self.on_sigterm)
+            if self.catch_sigusr2:
+                self.prev_sigusr2 = signal.getsignal(signal.SIGUSR2)
+                signal.signal(signal.SIGUSR2, self.on_sigterm)
+        except ValueError as ve:
+            print('error using signal: {}'.format(ve))
 
         self.start_time = time.time()
         self.last_saved_time = self.start_time
@@ -214,29 +217,32 @@ class SingleChannel(Channel):
         if type_:
             traceback.print_exception(type_, value, tb_traceback)
 
-        if self.catch_sigterm:
-            if self.prev_sigterm is not None:
-                signal.signal(signal.SIGTERM, self.prev_sigterm)
-            else:
-                signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        try:
+            if self.catch_sigterm:
+                if self.prev_sigterm is not None:
+                    signal.signal(signal.SIGTERM, self.prev_sigterm)
+                else:
+                    signal.signal(signal.SIGTERM, signal.SIG_DFL)
 
-            self.prev_sigterm = None
+                self.prev_sigterm = None
 
-        if self.catch_sigint:
-            if self.prev_sigint is not None:
-                signal.signal(signal.SIGINT, self.prev_sigint)
-            else:
-                signal.signal(signal.SIGINT, signal.SIG_DFL)
+            if self.catch_sigint:
+                if self.prev_sigint is not None:
+                    signal.signal(signal.SIGINT, self.prev_sigint)
+                else:
+                    signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-            self.prev_sigint = None
+                self.prev_sigint = None
 
-        if self.catch_sigusr2:
-            if self.prev_sigusr2 is not None:
-                signal.signal(signal.SIGUSR2, self.prev_sigusr2)
-            else:
-                signal.signal(signal.SIGUSR2, signal.SIG_DFL)
+            if self.catch_sigusr2:
+                if self.prev_sigusr2 is not None:
+                    signal.signal(signal.SIGUSR2, self.prev_sigusr2)
+                else:
+                    signal.signal(signal.SIGUSR2, signal.SIG_DFL)
 
-            self.prev_sigusr2 = None
+                self.prev_sigusr2 = None
+        except ValueError as ve:
+            print('error using signal: {}'.format(ve))
 
         # This fct is called multiple time. We want to record the time only when the jobs finish.
         if hasattr(self.state.jobman, 'status') and self.state.jobman.status == 2:

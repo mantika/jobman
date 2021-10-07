@@ -57,6 +57,10 @@ def json_default(value):
     raise TypeError('Type {} is not JSON serializable'.format(type(value).__name__))
 
 
+def hash_js(js):
+    return hashlib.sha224(js.encode('utf-8')).hexdigest()
+
+
 def book_dct_postgres_serial(db, retry_max_sleep=10.0, verbose=1):
     """Find a trial in the lisa_db with status START.
 
@@ -97,15 +101,23 @@ def book_dct_postgres_serial(db, retry_max_sleep=10.0, verbose=1):
         # this doesn't seem to work, hene the string hack below
         q = q.options(eagerload('_attrs'))  # hard-coded in api0
 
+        js_hash = None
         # try to reserve a dct
         try:
             # first() may raise psycopg2.ProgrammingError
             dct = q.first()
             if dct is not None:
-                js = json.dumps(list(sorted(dct.items())), ensure_ascii=False, default=json_default)
-                assert (hash(js) not in dcts_seen)
+                js = json.dumps(sorted(dct.items()), sort_keys=True, separators=(',', ':'),
+                                ensure_ascii=False, default=json_default)
+                js_hash = hash_js(js)
+                if js_hash in dcts_seen:
+                    print('dct already already seen', dct)
+                    s.rollback()
+                    continue
+
                 if verbose:
                     print('book_unstarted_dct retrieved, ', dct)
+
                 dct._set_in_session(STATUS, RUNNING, s)
                 if _TEST_CONCURRENCY:
                     print('SLEEPING BEFORE BOOKING', file=sys.stderr)
@@ -124,16 +136,19 @@ def book_dct_postgres_serial(db, retry_max_sleep=10.0, verbose=1):
                 print('caught exception', e)
             if dct:
                 # first() succeeded, commit() failed
-                dcts_seen.add(hash(json.dumps(sorted(list(dct.items())))))
+                dcts_seen.add(js_hash)
                 dct = None
+
             wait = random.random() * retry_max_sleep
             if verbose:
                 print('another process stole our dct. Waiting %f secs' % wait)
+
             print('waiting for %i second' % wait)
             time.sleep(wait)
 
     if dct:
         str(dct)  # for loading of attrs in UGLY WAY!!!
+
     s.close()
     return dct
 

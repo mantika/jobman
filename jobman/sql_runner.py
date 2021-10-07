@@ -14,13 +14,18 @@ except:
     pass
 
 import os
+import sys
 import tempfile
 import shutil
 import socket
-import optparse
+import traceback
 import time
 import random
 import re
+import signal
+import multiprocessing as mp
+from contextlib import contextmanager
+from queue import Empty
 from optparse import OptionParser
 
 from .tools import expand, flatten, resolve, UsageError
@@ -28,7 +33,7 @@ from .runner import runner_registry
 from .channel import StandardChannel, JobError
 from . import parse
 from .sql import START, RUNNING, DONE, ERR_START, ERR_SYNC, ERR_RUN, CANCELED
-from .api0 import open_db
+from .api0 import open_db, parse_dbstring
 
 
 ###############################################################################
@@ -322,6 +327,7 @@ class DBRSyncChannel(RSyncChannel):
             self.state.jobman.sql.priority < self.RESTART_PRIORITY):
             self.state.jobman.sql.priority = self.RESTART_PRIORITY
             self.save()
+
         return v
 
 ###############################################################################
@@ -596,6 +602,69 @@ parser_sql.add_option('--module-path', action='store',
                       help='module path for importing the experiment')
 
 
+def run_job(out_queue, dbdescr, workdir, exproot, module_path, redirect_stdout=True, redirect_stderr=True,
+            finish_up_after=None, save_interval=None):
+    try:
+        db = open_db(dbdescr, serial=True)
+        channel = DBRSyncChannel(db,
+                                 workdir,
+                                 exproot,
+                                 redirect_stdout=redirect_stdout,
+                                 redirect_stderr=redirect_stderr,
+                                 finish_up_after=finish_up_after,
+                                 save_interval=save_interval,
+                                 module_path=module_path)
+        status = channel.run()
+    except JobError as ex:
+        if ex.args[0] == JobError.NOJOB:
+            out_queue.put({'status': 'nojob',
+                           'args': ex.args})
+        elif ex.args[0] == JobError.DONE:
+            out_queue.put({'status': 'success',
+                           'value': 2})
+        else:
+            tb = traceback.format_exc()
+            out_queue.put({'status': 'error',
+                           'type': type(ex).__name__,
+                           'args': ex.args,
+                           'msg': str(ex),
+                           'trace': traceback.format_exc()})
+    except Exception as ex:
+        print('{} exception raised: {}'.format(type(ex).__name__, ex))
+        tb = traceback.format_exc()
+        print(tb, file=sys.stderr)
+        out_queue.put({'status': 'error',
+                       'type': type(ex).__name__,
+                       'args': ex.args,
+                       'msg': str(ex),
+                       'trace': traceback.format_exc()})
+    else:
+        out_queue.put({'status': 'success',
+                       'value': status})
+
+
+@contextmanager
+def signalhandler(process):
+    def on_sigterm(signo, frame):
+        # SIGTERM handler. It is the experiment function's responsibility to
+        # call switch() often enough to get this feedback.
+        process.terminate()
+        process.join()
+
+    try:
+        signal.signal(signal.SIGTERM, on_sigterm)
+        signal.signal(signal.SIGINT, on_sigterm)
+        try:
+            signal.signal(signal.SIGUSR2, on_sigterm)
+        except AttributeError:
+            # sigusr2 not supported
+            pass
+
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
+
 def runner_sql(options, dbdescr, exproot):
     """
     Run jobs from a sql table.
@@ -634,12 +703,16 @@ def runner_sql(options, dbdescr, exproot):
         modules = options.modules.split(',')
     else:
         modules = []
+
     for module in modules:
         __import__(module, fromlist=[])
 
-    db = open_db(dbdescr, serial=True)
     n = options.n if options.n else -1
+    dburl = parse_dbstring(dbdescr)
+    tablename = dburl.query.get('table')
     nrun = 0
+    mpctx = mp.get_context(method='spawn')
+    status_queue = mpctx.Queue()
     try:
         while n != 0:
             if options.workdir:
@@ -647,25 +720,37 @@ def runner_sql(options, dbdescr, exproot):
             else:
                 if options.workdir_dir and not os.path.exists(options.workdir_dir):
                     os.mkdir(options.workdir_dir)
-                workdir = tempfile.mkdtemp(dir=options.workdir_dir)
-            print("The working directory is:", os.path.join(os.getcwd(), workdir))
 
-            channel = DBRSyncChannel(db,
-                                     workdir,
-                                     exproot,
-                                     redirect_stdout=True,
-                                     redirect_stderr=True,
-                                     finish_up_after=options.finish_up_after or None,
-                                     save_interval=options.save_every or None,
-                                     module_path=options.module_path
-                                     )
-            channel.run()
+                workdir = tempfile.mkdtemp(prefix=tablename, dir=options.workdir_dir)
+
+            print("The working directory is:", os.path.join(os.getcwd(), workdir))
+            task = mpctx.Process(target=run_job, args=(status_queue, dbdescr, workdir, exproot, options.module_path),
+                                 kwargs={'redirect_stdout': True,
+                                         'redirect_stderr': True,
+                                         'finish_up_after': options.finish_up_after or None,
+                                         'save_interval': options.save_every or None},
+                                 name=f'jobman:{tablename}')
+            task.start()
+            with signalhandler(task):
+                task.join()
+                try:
+                    result = status_queue.get(timeout=5.)
+                except Empty:
+                    break
+                else:
+                    if result['status'] == 'nojob':
+                        print('No more jobs to run (run %i jobs)' % nrun)
+                        break
+
+                    if result['status'] == 'error':
+                        print(f'{result["type"]} error raised in job: {result["str"]}')
+                        print(result['trace'])
 
             # Useful for manual tests; leave this there, just commented.
-            #cachesync_runner.manualtest_before_delete()
+            # cachesync_runner.manualtest_before_delete()
             with cachesync_lock(None, workdir):
                 # Useful for manual tests; leave this there, just
-                #commented.  cachesync_runner.manualtest_will_delete()
+                # commented.  cachesync_runner.manualtest_will_delete()
 
                 shutil.rmtree(workdir, ignore_errors=True)
 
@@ -674,6 +759,9 @@ def runner_sql(options, dbdescr, exproot):
     except JobError as e:
         if e.args[0] == JobError.NOJOB:
             print('No more jobs to run (run %i jobs)' % nrun)
+    finally:
+        status_queue.close()
+
 
 runner_registry['sql'] = (parser_sql, runner_sql)
 
