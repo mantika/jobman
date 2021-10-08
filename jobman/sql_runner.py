@@ -743,7 +743,7 @@ def runner_sql(options, dbdescr, exproot):
                         break
 
                     if result['status'] == 'error':
-                        print(f'{result["type"]} error raised in job: {result["str"]}')
+                        print(f'{result["type"]} error raised in job: {result["msg"]}')
                         print(result['trace'])
 
             # Useful for manual tests; leave this there, just commented.
