@@ -2,15 +2,11 @@
 This file defines class `DbHandle` and a few routines for creating instances of DbHandle.
 
 """
-from __future__ import print_function
-from __future__ import unicode_literals
 import logging
 import time
 import random
 import os
-from builtins import str
-from builtins import object
-from jobman import sql
+from . import sql
 
 if sql.sqlalchemy_ok:
     import sqlalchemy.pool
@@ -20,7 +16,7 @@ if sql.sqlalchemy_ok:
         Table, Column, MetaData, ForeignKeyConstraint  # ForeignKey,
     )
     from sqlalchemy import (
-        Integer, String, Float, DateTime, Text, Binary  # Boolean,
+        Integer, String, Float, DateTime, Text, LargeBinary as Binary  # Boolean,
     )
     try:
         from sqlalchemy import BigInteger
@@ -39,7 +35,7 @@ if sql.sqlalchemy_ok:
     from sqlalchemy.engine.url import make_url
 
 else:
-    from jobman import fake_sqlalchemy as sqlalchemy
+    from . import fake_sqlalchemy as sqlalchemy
 
 
 class Todo(Exception):

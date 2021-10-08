@@ -1,20 +1,10 @@
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import unicode_literals
-from builtins import str
-from builtins import bytes
 import sys
 import copy
 import time
-
-# Python 2.4 compatibility.
-try:
-    import hashlib
-except ImportError:
-    import md5 as hashlib
-
+import hashlib
 import random
 import json
+
 sqlalchemy_ok = True
 try:
     import sqlalchemy

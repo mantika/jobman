@@ -1,21 +1,14 @@
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import unicode_literals
-from builtins import map
-from builtins import object
-from future.utils import raise_
 import signal
 import sys
 import os
 import time
 import traceback
-
-from .tools import *
-
+from .tools import format_d, expand, defaults_merge
+from .parse import filemerge
 
 
 ################################################################################
-### JobError
+# JobError
 ################################################################################
 
 class JobError(Exception):
@@ -25,32 +18,40 @@ class JobError(Exception):
 
 
 ################################################################################
-### Channel base class
+# Channel base class
 ################################################################################
 
-class Channel(object):
 
-    COMPLETE = property(lambda s:None,
-            doc=("Experiments should return this value to "
-                "indicate that they are done (if not done, return `INCOMPLETE`"))
-    INCOMPLETE = property(lambda s:True,
-            doc=("Experiments should return this value to indicate that "
-                 "they are not done (usefull if the jobs is interrupted) (if done return `COMPLETE`)"))
+class Channel:
+
+    COMPLETE = property(lambda s: None,
+                        doc=("Experiments should return this value to "
+                             "indicate that they are done (if not done, return `INCOMPLETE`"))
+    INCOMPLETE = property(lambda s: True,
+                          doc=("Experiments should return this value to indicate that "
+                               "they are not done (usefull if the jobs is interrupted) (if done return `COMPLETE`)"))
 
     START = property(lambda s: 0,
-            doc="jobman.status == START means a experiment is ready to run")
+                     doc="jobman.status == START means a experiment is ready to run")
     RUNNING = property(lambda s: 1,
-            doc="jobman.status == RUNNING means a experiment is running on jobman_hostname")
+                       doc="jobman.status == RUNNING means a experiment is running on jobman_hostname")
     DONE = property(lambda s: 2,
-            doc="jobman.status == DONE means a experiment has completed (not necessarily successfully)")
+                    doc="jobman.status == DONE means a experiment has completed (not necessarily successfully)")
     ERR_START = property(lambda s: 3,
-            doc="jobman.status == ERR_START means can't be started for some reason(ex: can't make the destination experiment directory.")
+                         doc=("jobman.status == ERR_START means can't be started for some "
+                              "reason(ex: can't make the destination experiment directory."))
     ERR_SYNC = property(lambda s: 4,
-            doc="jobman.status == ERR_SYNC means that the experiment was unable to synchronize the experiment directory.")
+                        doc=("jobman.status == ERR_SYNC means that the experiment was unable to synchronize "
+                             "the experiment directory."))
     ERR_RUN = property(lambda s: 5,
-            doc="jobman.status == ERR_RUN means that the experiment did not return `COMPLETE` or `INCOMPLETE`. As COMPLETE is None, it you did not return, but default it return None and this means `COMPLETE`")
+                       doc=("jobman.status == ERR_RUN means that the experiment did not return `COMPLETE` or "
+                            "`INCOMPLETE`. As COMPLETE is None, it you did not return, but default it return "
+                            "None and this means `COMPLETE`"))
     CANCELED = property(lambda s: -1,
-            doc="jobman.status == CANCELED means that user set the job to that mode and don't want to start it. If the jobs is already started and finish, it will change its status to DONE or START depending of the return value. It the started job crash, the status won't change autamatically.")
+                        doc=("jobman.status == CANCELED means that user set the job to that mode and don't "
+                             "want to start it. If the jobs is already started and finish, it will change "
+                             "its status to DONE or START depending of the return value. It the started job "
+                             "crash, the status won't change autamatically."))
 
     # Methods to be used by the experiment to communicate with the channel
 
@@ -61,7 +62,7 @@ class Channel(object):
         """
         raise NotImplementedError()
 
-    def switch(self, message = None):
+    def switch(self, message=None):
         """
         Called from the experiment to give the control back to the channel.
         The following return values are meaningful:
@@ -73,9 +74,8 @@ class Channel(object):
           * 'save' -> the experiment should continue until it reaches a check-point,
             then save(by calling channel.save()) and continue.
         """
-        pass
 
-    def __call__(self, message = None):
+    def __call__(self, message=None):
         return self.switch(message)
 
     def save_and_switch(self):
@@ -90,22 +90,25 @@ class Channel(object):
     def __enter__(self):
         pass
 
-    def __exit__(self):
+    def __exit__(self, type_, value, tb_traceback):
         pass
 
     def run(self):
         pass
 
 ################################################################################
-### Empty Channel: useful for debugging
+# Empty Channel: useful for debugging
 ################################################################################
+
+
 class EmptyChannel(Channel):
     def save(self):
         pass
 
 ################################################################################
-### Channel for a single experiment
+# Channel for a single experiment
 ################################################################################
+
 
 class SingleChannel(Channel):
 
@@ -115,7 +118,7 @@ class SingleChannel(Channel):
         self.feedback = None
         self.finish_up_notified = False
 
-        #TODO: make this a property and disallow changing it during a with block
+        # TODO: make this a property and disallow changing it during a with block
         self.catch_sigterm = True
         self.catch_sigint = True
         try:
@@ -125,7 +128,7 @@ class SingleChannel(Channel):
             print('SingleChannel - warning, cannot use signal.SIGUSR2.')
             self.catch_sigusr2 = False
 
-        #TODO: parse more advanced strings, like [[[dd:]hh:]mm:]ss, <n>d, <n>h, <n>m, ...
+        # TODO: parse more advanced strings, like [[[dd:]hh:]mm:]ss, <n>d, <n>h, <n>m, ...
         if finish_up_after is not None:
             self.finish_up_after = int(finish_up_after)
         else:
@@ -135,7 +138,7 @@ class SingleChannel(Channel):
         else:
             self.save_interval = None
 
-    def switch(self, message = None):
+    def switch(self, message=None):
         now = time.time()
         if self.feedback is None and not self.finish_up_notified:
             if self.finish_up_after is not None and\
@@ -255,13 +258,13 @@ class SingleChannel(Channel):
 
 
 ################################################################################
-### Standard channel (with a path for the workdir)
+# Standard channel (with a path for the workdir)
 ################################################################################
 
 class StandardChannel(SingleChannel):
 
-    def __init__(self, path, experiment, state, redirect_stdout = False, redirect_stderr = False,
-            finish_up_after = None, save_interval = None):
+    def __init__(self, path, experiment, state, redirect_stdout=False, redirect_stderr=False,
+                 finish_up_after=None, save_interval=None):
         super(StandardChannel, self).__init__(experiment, state, finish_up_after, save_interval)
         self.path = os.path.realpath(path)
         self.redirect_stdout = redirect_stdout
@@ -273,8 +276,8 @@ class StandardChannel(SingleChannel):
             x = os.path.realpath(path)
             os.chdir(self.path)
             return x
-        else:
-            return os.path.realpath(path)
+
+        return os.path.realpath(path)
 
     def save(self):
         sys.stdout.flush()
@@ -297,8 +300,8 @@ class StandardChannel(SingleChannel):
             sys.stderr = open('stderr', 'a')
         return super(StandardChannel, self).__enter__()
 
-    def __exit__(self, type, value, traceback):
-        rval = super(StandardChannel, self).__exit__(type, value, traceback, save = False)
+    def __exit__(self, type_, value, traceback):
+        rval = super(StandardChannel, self).__exit__(type_, value, traceback, save=False)
         if self.redirect_stdout:
             new_stdout = sys.stdout
             sys.stdout = self.old_stdout
@@ -307,6 +310,7 @@ class StandardChannel(SingleChannel):
             new_stderr = sys.stderr
             sys.stderr = self.old_stderr
             new_stderr.close()
+
         os.chdir(self.old_cwd)
         self.save()
         return rval
@@ -328,7 +332,7 @@ class StandardChannel(SingleChannel):
             currentf = os.path.join(self.path, 'current.conf')
             if os.path.isfile(currentf):
                 current_data = list(map(str.strip, open(currentf, 'r').readlines()))
-                state = expand(parse.filemerge(*current_data))
+                state = expand(filemerge(*current_data))
                 defaults_merge(self.state, state)
         except Exception:
             # The exception info is passed to the __exit__ method which will

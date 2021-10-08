@@ -1,21 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-from builtins import map
-try:
-    from functools import partial
-except ImportError:
-    # Copied from theano.gof.python25, but not imported to avoid dependency on
-    # Theano.
-    def partial(func, *args, **keywords):
-        def newfunc(*fargs, **fkeywords):
-            newkeywords = keywords.copy()
-            newkeywords.update(fkeywords)
-            return func(*(args + fargs), **newkeywords)
-        newfunc.func = func
-        newfunc.args = args
-        newfunc.keywords = keywords
-        return newfunc
-        
 import re
 import os
 
@@ -26,20 +8,25 @@ try:
 except ImportError:
     numpy = None
 
+from functools import partial
 from .tools import UsageError, reval
 
 
 def _convert(obj):
     if numpy is None:
-        globals = {}
+        globals_ = {}
     else:
-        globals = {'inf': numpy.inf, 'nan': numpy.nan}
+        globals_ = {'inf': numpy.inf, 'nan': numpy.nan}
+
     try:
-        return eval(obj, globals, {})
+        return eval(obj, globals_, {})
     except (NameError, SyntaxError):
         return obj
 
+
 SPLITTER = re.compile('([^:=]*)(:=|=|::)(.*)')
+
+
 def standard(*strings, **kwargs):
     converter = kwargs.get('converter', _convert)
     d = {}
@@ -56,15 +43,19 @@ def standard(*strings, **kwargs):
         elif m.group(2) == ':=':
             v = reval(m.group(3).strip())
         else:
-            assert False # Forgot to add case to match re.
+            assert False  # Forgot to add case to match re.
         d[k] = v
     return d
 
+
 _comment_pattern = re.compile('#.*')
+
+
 def filemerge(*strings, **kwargs):
     lineparser = kwargs.get('lineparser', standard)
     state = {}
-    def process(s, cwd = None, prefix = None):
+
+    def process(s, cwd=None, prefix=None):
         if '=' in s or '::' in s:
             d = lineparser(s)
             if prefix:
@@ -88,7 +79,7 @@ def filemerge(*strings, **kwargs):
         process(s)
     return state
 
-raw = partial(standard, converter = lambda x:x)
 
-raw_filemerge = partial(filemerge, lineparser = raw)
+raw = partial(standard, converter=lambda x: x)
 
+raw_filemerge = partial(filemerge, lineparser=raw)

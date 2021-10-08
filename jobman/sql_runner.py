@@ -1,20 +1,10 @@
-""" WRITEME """
-from __future__ import with_statement
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
-from builtins import str
-from builtins import range
 try:
     from . import sql
     from .cachesync_runner import cachesync_lock
-    from . import cachesync_runner
-except:
-    pass
+except ImportError as _imex:
+    print('Import error: {}'.format(_imex))
 
 import os
-import sys
 import tempfile
 import shutil
 import socket
@@ -24,8 +14,11 @@ import random
 import re
 import signal
 import multiprocessing as mp
-from contextlib import contextmanager
+from contextlib import (
+    contextmanager, redirect_stdout as ctx_redirect_stdout, redirect_stderr as ctx_redirect_stderr, ExitStack
+)
 from queue import Empty
+from pathlib import Path
 from optparse import OptionParser
 
 from .tools import expand, flatten, resolve, UsageError
@@ -37,11 +30,11 @@ from .api0 import open_db, parse_dbstring
 
 
 ###############################################################################
-### Channels
+# Channels
 ###############################################################################
 
 ###############################################################################
-### RSync channel
+# RSync channel
 ###############################################################################
 
 
@@ -98,7 +91,7 @@ class RSyncChannel(StandardChannel):
 
         with cachesync_lock(None, self.path):
             # Useful for manual tests; leave this there, just commented.
-            #cachesync_runner.manualtest_will_save()
+            # cachesync_runner.manualtest_will_save()
 
             # allow n-number of retries, with random hold-off between retries
             attempt = 0
@@ -112,8 +105,8 @@ class RSyncChannel(StandardChannel):
                     if keep_trying:
                         r = random.randint(30, attempt * 120)
                         print(('RSync Error at attempt %i/%i'
-                                                 ': sleeping %is') % (
-                                                     attempt, num_retries, r), file=os.sys.stderr)
+                               ': sleeping %is') % (
+                            attempt, num_retries, r), file=os.sys.stderr)
                         time.sleep(r)
 
         if rsync_rval != 0:
@@ -140,12 +133,12 @@ class RSyncChannel(StandardChannel):
 
     def save(self, num_retries=3):
         # Useful for manual tests; leave this there, just commented.
-        #cachesync_runner.manualtest_inc_save_count()
+        # cachesync_runner.manualtest_inc_save_count()
 
         if self.sync_in_save:
             super(RSyncChannel, self).save()
             self.push(num_retries=num_retries)
-        #TODO: else: update current.conf with only state.jobman, push current.conf
+        # TODO: else: update current.conf with only state.jobman, push current.conf
 
     def setup(self):
         self.touch()
@@ -154,7 +147,7 @@ class RSyncChannel(StandardChannel):
 
 
 ###############################################################################
-### DB + RSync channel
+# DB + RSync channel
 ###############################################################################
 
 class DBRSyncChannel(RSyncChannel):
@@ -223,12 +216,12 @@ class DBRSyncChannel(RSyncChannel):
             if self.sync_in_save:
                 # update DB
                 self.dbstate.update_in_session(flatten(self.state), session,
-                        _recommit_times=num_retries)
+                                               _recommit_times=num_retries)
             else:
                 # update only jobman.*
                 state_jobman = flatten({'jobman': self.state.jobman})
                 self.dbstate.update_in_session(state_jobman, session,
-                        _recommit_times=num_retries)
+                                               _recommit_times=num_retries)
 
         finally:
             session.close()
@@ -246,7 +239,7 @@ class DBRSyncChannel(RSyncChannel):
                 if hasattr(state, key):
                     del state[key]
 
-        #put jobs scheduler info into the state
+        # put jobs scheduler info into the state
         condor_slot = os.getenv("_CONDOR_SLOT")
         sge_task_id = os.getenv('SGE_TASK_ID')
         pbs_task_id = os.getenv('PBS_JOBID')
@@ -278,9 +271,9 @@ class DBRSyncChannel(RSyncChannel):
             self.state.jobman.sql.pbs_arrayid = os.getenv('PBS_ARRAYID')
             self.state.jobman.sql.pbs_num_ppn = os.getenv('PBS_NUM_PPN')
 
-        #delete old jobs scheduler info into the state
-        #this is needed in case we move a job to a different system.
-        #to know where it is running now.
+        # delete old jobs scheduler info into the state
+        # this is needed in case we move a job to a different system.
+        # to know where it is running now.
         key_to_del = []
         if not condor_slot:
             key_to_del.extend(['jobman.sql.condor_global_job_id',
@@ -324,19 +317,20 @@ class DBRSyncChannel(RSyncChannel):
         # already set to RUNNING by book_dct in __init__
         v = super(DBRSyncChannel, self).run(force=True)
         if (v is self.INCOMPLETE and
-            self.state.jobman.sql.priority < self.RESTART_PRIORITY):
+                self.state.jobman.sql.priority < self.RESTART_PRIORITY):
             self.state.jobman.sql.priority = self.RESTART_PRIORITY
             self.save()
 
         return v
 
 ###############################################################################
-### Runners
+# Runners
 ###############################################################################
 
 ###############################################################################
-### sqlschedule
+# sqlschedule
 ###############################################################################
+
 
 parser_sqlschedule = OptionParser(
     usage='%prog sqlschedule [options] <tablepath> <experiment> <parameters>',
@@ -392,10 +386,11 @@ def runner_sqlschedule(options, dbdescr, experiment, *strings):
     state['jobman.experiment'] = experiment
     sql.add_experiments_to_db([state], db, verbose=1, force_dup=options.force)
 
+
 runner_registry['sqlschedule'] = (parser_sqlschedule, runner_sqlschedule)
 
 ###############################################################################
-### sqlschedules
+# sqlschedules
 ###############################################################################
 
 parser_sqlschedules = OptionParser(
@@ -431,9 +426,9 @@ def generate_combination(repl):
 
 
 def generate_commands(sp):
-### Find replacement lists in the arguments
+    # Find replacement lists in the arguments
     repl = []
-    p = re.compile('\{\{\S*?\}\}')
+    p = re.compile(r'\{\{\S*?\}\}')
     for arg in sp:
         reg = p.findall(arg)
         if len(reg) == 1:
@@ -484,11 +479,11 @@ def runner_sqlschedules(options, dbdescr, experiment, *strings):
 
     db = open_db(dbdescr, serial=True)
 
-    ### resolve(experiment) # we try to load the function associated to the experiment
+    # resolve(experiment) # we try to load the function associated to the experiment
 
     verbose = not options.quiet
 
-    (commands,choise_args)=generate_commands(strings)
+    (commands, choise_args) = generate_commands(strings)
     if verbose:
         print(commands, choise_args)
 
@@ -501,8 +496,8 @@ def runner_sqlschedules(options, dbdescr, experiment, *strings):
         if options.quiet:
             print("Added %d jobs to the db" % len(commands))
     else:
-        #if the first insert fail, we won't force the other as the
-        #force option was not gived.
+        # if the first insert fail, we won't force the other as the
+        # force option was not gived.
         failed = 0
         for cmd in commands:
             state = parser(*cmd)
@@ -514,15 +509,17 @@ def runner_sqlschedules(options, dbdescr, experiment, *strings):
                 sql.add_experiments_to_db([state] * (options.repeat-1), db,
                                           verbose=verbose, force_dup=True)
             else:
-                failed+=1
+                failed += 1
                 if verbose:
                     print("The last cmd failed to insert, we won't repeat it. use --force to force the duplicate of job in the db.")
         print("Added", len(commands) - failed, "on", len(commands), "jobs")
+
+
 runner_registry['sqlschedules'] = (parser_sqlschedules, runner_sqlschedules)
 
- ################################################################################
+################################################################################
 # ### sqlschedule_filemerge
- ################################################################################
+################################################################################
 
 # parser_sqlschedule_filemerge = OptionParser(
 #     usage = '%prog sqlschedule_filemerge [options] <tablepath> <experiment> <parameters|files>',
@@ -573,7 +570,7 @@ runner_registry['sqlschedules'] = (parser_sqlschedules, runner_sqlschedules)
 
 
 ################################################################################
-### sql
+# sql
 ################################################################################
 
 parser_sql = OptionParser(usage='%prog sql [options] <tablepath> <exproot>',
@@ -605,16 +602,28 @@ parser_sql.add_option('--module-path', action='store',
 def run_job(out_queue, dbdescr, workdir, exproot, module_path, redirect_stdout=True, redirect_stderr=True,
             finish_up_after=None, save_interval=None):
     try:
-        db = open_db(dbdescr, serial=True)
-        channel = DBRSyncChannel(db,
-                                 workdir,
-                                 exproot,
-                                 redirect_stdout=redirect_stdout,
-                                 redirect_stderr=redirect_stderr,
-                                 finish_up_after=finish_up_after,
-                                 save_interval=save_interval,
-                                 module_path=module_path)
-        status = channel.run()
+        wdp = Path(workdir)
+        with ExitStack() as stack:
+            if redirect_stdout:
+                stdout_file = (wdp / 'stdout').open('w')
+                stack.enter_context(stdout_file)
+                stack.enter_context(ctx_redirect_stdout(stdout_file))
+
+            if redirect_stderr:
+                stderr_file = (wdp / 'stderr').open('w')
+                stack.enter_context(stderr_file)
+                stack.enter_context(ctx_redirect_stderr(stderr_file))
+
+            db = open_db(dbdescr, serial=True)
+            channel = DBRSyncChannel(db,
+                                     workdir,
+                                     exproot,
+                                     redirect_stdout=False,
+                                     redirect_stderr=False,
+                                     finish_up_after=finish_up_after,
+                                     save_interval=save_interval,
+                                     module_path=module_path)
+            status = channel.run()
     except JobError as ex:
         if ex.args[0] == JobError.NOJOB:
             out_queue.put({'status': 'nojob',
@@ -632,7 +641,7 @@ def run_job(out_queue, dbdescr, workdir, exproot, module_path, redirect_stdout=T
     except Exception as ex:
         print('{} exception raised: {}'.format(type(ex).__name__, ex))
         tb = traceback.format_exc()
-        print(tb, file=sys.stderr)
+        print(tb)
         out_queue.put({'status': 'error',
                        'type': type(ex).__name__,
                        'args': ex.args,
@@ -812,6 +821,7 @@ def runner_sqlview(options, dbdescr, viewname):
     else:
         db.createView(viewname, not options.quiet)
 
+
 runner_registry['sqlview'] = (parser_sqlview, runner_sqlview)
 
 
@@ -835,36 +845,38 @@ def to_status_number(i):
             status = int(i)
             assert status in [0, 1, 2, 3, 4, 5, -1]
         except Exception as e:
-            raise ValueError("The status must be a str in START, RUNNING, DONE, ERR_START, ERR_SYNC, ERR_RUN, CANCELED or a int in 0,1,2,3,4,5,-1")
+            raise ValueError(
+                "The status must be a str in START, RUNNING, DONE, ERR_START, ERR_SYNC, ERR_RUN, CANCELED or a int in 0,1,2,3,4,5,-1")
     return status
 
+
 parser_sqlstatus = OptionParser(usage='%prog sqlstatus [--print=KEY] [--status=JOB_STATUS] [--set_status=JOB_STATUS] [--fselect=lambda blob: ...] [--resert_prio] [--select=key=value] [--quiet] [--ret_nb_jobs] <tablepath> <job id>...',
-                              add_help_option=False)
+                                add_help_option=False)
 parser_sqlstatus.add_option('--set_status', action="store",
                             dest="set_status", default='',
-                          help='If present, will change the status of jobs to START,RUNNING,DONE,ERR_START,ERR_SYNC,ERR_RUN,CANCELED. depending of the value gived to this option (default don\'t change the status)')
+                            help='If present, will change the status of jobs to START,RUNNING,DONE,ERR_START,ERR_SYNC,ERR_RUN,CANCELED. depending of the value gived to this option (default don\'t change the status)')
 parser_sqlstatus.add_option('--all', action="store_true", dest="all",
-                          help='Append all jobs in the db to the list of jobs.')
+                            help='Append all jobs in the db to the list of jobs.')
 parser_sqlstatus.add_option('--status', action="append", dest="status",
                             help='Append jobs in the db with the gived status'
                             ' to the list of jobs. You can pass multiple time'
                             ' this parameter.')
 parser_sqlstatus.add_option('--reset_prio', action="store_true", dest="reset_prio",
-                          help='Reset the priority to the default.')
+                            help='Reset the priority to the default.')
 parser_sqlstatus.add_option('--ret_nb_jobs', action="store_true", dest="ret_nb_jobs",
-                          help='Print only the number of jobs selected.')
-parser_sqlstatus.add_option('-q','--quiet', action="store_true", dest="quiet",
-                          help='Be less verbose.')
+                            help='Print only the number of jobs selected.')
+parser_sqlstatus.add_option('-q', '--quiet', action="store_true", dest="quiet",
+                            help='Be less verbose.')
 parser_sqlstatus.add_option('--select', action="append", dest="select",
-                          help='Append jobs in the db that match that param=value values to the list of jobs. If multiple --select option, matched jobs must support all those restriction')
+                            help='Append jobs in the db that match that param=value values to the list of jobs. If multiple --select option, matched jobs must support all those restriction')
 parser_sqlstatus.add_option('--fselect', action="append", dest="fselect",
-                          help='Append jobs in the db that match that param=value values to the list of jobs. If multiple --select option, matched jobs must support all those restriction...')
+                            help='Append jobs in the db that match that param=value values to the list of jobs. If multiple --select option, matched jobs must support all those restriction...')
 parser_sqlstatus.add_option('--print', action="append",
                             dest="prints", default=[],
-                          help='print the value of the key for the jobs. Accept multiple --print parameter')
+                            help='print the value of the key for the jobs. Accept multiple --print parameter')
 parser_sqlstatus.add_option('--print-keys', action="store_true",
                             dest="print_keys", default=[],
-                          help='print all keys in the state of the first jobs.')
+                            help='print all keys in the state of the first jobs.')
 
 
 def runner_sqlstatus(options, dbdescr, *ids):
@@ -878,7 +890,7 @@ def runner_sqlstatus(options, dbdescr, *ids):
         jobman sqlstatus postgres://user:pass@host[:port]/dbname?table=tablename 10 11
 
     """
-    #we don't want to remove all output when we change the db.
+    # we don't want to remove all output when we change the db.
     if options.set_status and options.ret_nb_jobs:
         raise UsageError("The option --set_status and --ret_nb_jobs are mutually exclusive.")
 
@@ -888,7 +900,8 @@ def runner_sqlstatus(options, dbdescr, *ids):
         try:
             new_status = to_status_number(options.set_status)
         except ValueError:
-            raise UsageError("The option --set_status accept only the value START, RUNNING, DONE, ERR_START, ERR_SYNC, ERR_RUN, CANCELED or their equivalent int number")
+            raise UsageError("The option --set_status accept only the value START, RUNNING, DONE, ERR_START, "
+                             "ERR_SYNC, ERR_RUN, CANCELED or their equivalent int number")
     else:
         new_status = None
 
@@ -914,7 +927,7 @@ def runner_sqlstatus(options, dbdescr, *ids):
         if options.status:
             q = db.query(session)
             jobs = []
-            for  stat in options.status:
+            for stat in options.status:
                 jobs += q.filter_eq('jobman.status',
                                     to_status_number(stat)).all()
 
@@ -951,7 +964,7 @@ def runner_sqlstatus(options, dbdescr, *ids):
                         if f(job[k]):
                             ids.append(job.id)
                     else:
-                        print("job", job.id, "don't have the attribute",k)
+                        print("job", job.id, "don't have the attribute", k)
 
             del job, jobs, q
 
@@ -1025,7 +1038,7 @@ runner_registry['sqlstatus'] = (parser_sqlstatus, runner_sqlstatus)
 parser_sqlreload = OptionParser(usage='%prog sqlreload <tablepath> <exproot>/dbname/tablename <id>...',
                                 add_help_option=False)
 parser_sqlreload.add_option('--all', action="store_true", dest="all",
-                          help='If true, will reload all jobs that are in the directory. (default false)')
+                            help='If true, will reload all jobs that are in the directory. (default false)')
 
 
 def runner_sqlreload(options, dbdescr, table_dir, *ids):
@@ -1077,5 +1090,6 @@ def runner_sqlreload(options, dbdescr, table_dir, *ids):
                 pass
     finally:
         session.close()
+
 
 runner_registry['sqlreload'] = (parser_sqlreload, runner_sqlreload)

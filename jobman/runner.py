@@ -1,6 +1,3 @@
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import unicode_literals
 import os
 import sys
 import time
@@ -17,13 +14,13 @@ from . import parse
 from . import workdirgen
 
 ################################################################################
-### Running
+# Running
 ################################################################################
 
 
 def parse_and_run(command, arguments):
     if command == None:
-        #allow other parameter for help used in other program
+        # allow other parameter for help used in other program
         for arg in arguments:
             if arg in ["--help", "-h"]:
                 command = "help"
@@ -85,23 +82,23 @@ def warn_if_sql_failure():
             # Note: we use `RuntimeWarning` instead of `ImportWarning` because
             # the latter are ignored by default, and we do not want it to be
             # ignored.
-            print ("WARNING: SQL-related module '%s' could not be imported: SQL"
-                   " features will most likely crash" % module)
+            print("WARNING: SQL-related module '%s' could not be imported: SQL"
+                  " features will most likely crash" % module)
 
 
 ################################################################################
-### Registry
+# Registry
 ################################################################################
 
 runner_registry = dict()
 
 
 ################################################################################
-### Default runners
+# Default runners
 ################################################################################
 
 ################################################################################
-### cmdline
+# cmdline
 ################################################################################
 
 parser_cmdline = OptionParser(
@@ -191,15 +188,16 @@ def runner_cmdline(options, experiment, *strings):
 
     channel = StandardChannel(workdir,
                               experiment, state,
-                              redirect_stdout = options.redirect or options.redirect_stdout,
-                              redirect_stderr = options.redirect or options.redirect_stderr,
-                              finish_up_after = options.finish_up_after or None,
-                              save_interval = options.save_every or None
+                              redirect_stdout=options.redirect or options.redirect_stdout,
+                              redirect_stderr=options.redirect or options.redirect_stderr,
+                              finish_up_after=options.finish_up_after or None,
+                              save_interval=options.save_every or None
                               )
     channel.catch_sigint = not options.allow_sigint
     channel.run(force=options.force)
     if options.dry_run:
         shutil.rmtree(workdir, ignore_errors=True)
+
 
 runner_registry['cmdline'] = (parser_cmdline, runner_cmdline)
 
@@ -276,9 +274,8 @@ runner_registry['cmdline'] = (parser_cmdline, runner_cmdline)
 # runner_registry['filemerge'] = (parser_filemerge, runner_filemerge)
 
 
-
 ################################################################################
-### help
+# help
 ################################################################################
 def runner_help(options, topic=None):
     """
@@ -466,5 +463,6 @@ def runner_help(options, topic=None):
     print(format_help(helptext))
     if runner_registry.get(topic, [None])[0]:
         runner_registry.get(topic, [None])[0].print_help()
+
 
 runner_registry['help'] = (None, runner_help)
