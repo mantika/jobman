@@ -10,7 +10,7 @@ from optparse import OptionParser
 from .tools import DD, expand, format_help, resolve, UsageError
 from .channel import StandardChannel
 
-from . import parse
+from . import tools
 from . import workdirgen
 
 ################################################################################
@@ -163,7 +163,7 @@ def runner_cmdline(options, experiment, *strings):
         you can use the jobman.experiments.example1 as a working
         mymodule.my_experiment
     """
-    parser = getattr(parse, options.parser, None) or resolve(options.parser)
+    parser = getattr(tools, options.parser, None) or resolve(options.parser)
     _state = parser(*strings)
     state = expand(_state)
     state.setdefault('jobman', DD()).experiment = experiment

@@ -6,8 +6,7 @@ import glob
 import time
 import copy
 
-from .tools import DD
-from . import parse
+from .tools import DD, filemerge
 from .sql import RUNNING, DONE
 
 from optparse import OptionParser
@@ -186,7 +185,7 @@ class DistributedLock(object):
 
 def sync_single_directory(dir_path, all_jobs=None, force=False):
     if not all_jobs:
-        conf = DD(parse.filemerge(os.path.join(dir_path, 'current.conf')))
+        conf = DD(filemerge(os.path.join(dir_path, 'current.conf')))
     else:
         conf = [i for i in all_jobs if str(i.id) == os.path.split(dir_path)[-1]]
         assert len(conf) == 1

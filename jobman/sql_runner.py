@@ -21,12 +21,12 @@ from queue import Empty
 from pathlib import Path
 from optparse import OptionParser
 
-from .tools import expand, flatten, resolve, UsageError
+from .tools import expand, flatten, resolve, UsageError, filemerge
 from .runner import runner_registry
 from .channel import StandardChannel, JobError
-from . import parse
 from .sql import START, RUNNING, DONE, ERR_START, ERR_SYNC, ERR_RUN, CANCELED
 from .api0 import open_db, parse_dbstring
+from . import tools
 
 
 ###############################################################################
@@ -379,7 +379,7 @@ def runner_sqlschedule(options, dbdescr, experiment, *strings):
     """
     db = open_db(dbdescr, serial=True)
 
-    parser = getattr(parse, options.parser, None) or resolve(options.parser)
+    parser = getattr(tools, options.parser, None) or resolve(options.parser)
 
     state = parser(*strings)
     resolve(experiment)  # we try to load the function associated to the experiment
@@ -475,7 +475,7 @@ def runner_sqlschedules(options, dbdescr, experiment, *strings):
       value, etc. If their is many segment, it will generate the
       cross-product of possible value between the segment.
     """
-    parser = getattr(parse, options.parser, None) or resolve(options.parser)
+    parser = getattr(tools, options.parser, None) or resolve(options.parser)
 
     db = open_db(dbdescr, serial=True)
 
@@ -1077,7 +1077,7 @@ def runner_sqlreload(options, dbdescr, table_dir, *ids):
         for id in ids:
             # Get state dict from the file
             file_name = '%s/%i/current.conf' % (table_dir, id)
-            file_state = parse.filemerge(file_name)
+            file_state = filemerge(file_name)
 
             # Get state dict from the DB
             db_state = db.get(id)

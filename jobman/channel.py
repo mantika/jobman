@@ -3,8 +3,7 @@ import sys
 import os
 import time
 import traceback
-from .tools import format_d, expand, defaults_merge
-from .parse import filemerge
+from .tools import format_d, expand, defaults_merge, filemerge
 
 
 ################################################################################
