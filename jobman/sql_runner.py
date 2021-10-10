@@ -911,6 +911,7 @@ def runner_sqlstatus(options, dbdescr, *ids):
         verbose = 0
     else:
         verbose += 1
+
     ids = list(ids)
     try:
         session = db.session()

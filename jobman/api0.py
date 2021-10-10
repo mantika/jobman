@@ -820,8 +820,12 @@ def parse_dbstring(dbstring):
         if url.drivername in ('postgres', 'postgresql'):
             db = url.database.split('/')
             if len(db) == 2:
-                url.database = db[0]
-                url.query['table'] = db[1]
+                url = url._asdict()
+                url['database'] = db[0]
+                query = dict(url['query'])
+                query['table'] = db[1]
+                url['query'] = query
+                url = URL.create(**url)
         else:
             raise ValueError('no table name provided (add ?table=tablename)')
 
