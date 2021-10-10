@@ -163,8 +163,7 @@ def db(dbstr):
 
 
 def hash_state(state):
-    l = list((k, str(v)) for k, v in state.items())
-    l.sort()
+    l = sorted((k, str(v)) for k, v in state.items())
     rl = repr(l)
     if isinstance(rl, str):
         rl = rl.encode()

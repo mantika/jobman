@@ -10,7 +10,7 @@
 from setuptools import setup
 
 setup(name='Jobman',
-      version='2.0.3',
+      version='2.0.4',
       description=('Facilitate handling of many jobs'
                    '(especially jobs send on cluster)'),
       license='3-clause BSD',
