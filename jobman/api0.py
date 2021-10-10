@@ -32,7 +32,7 @@ if sql.sqlalchemy_ok:
     from sqlalchemy.sql import select  # operators
     from sqlalchemy.sql.expression import column, not_, literal_column  # outerjoin
 
-    from sqlalchemy.engine.url import make_url
+    from sqlalchemy.engine.url import make_url, URL
 
 else:
     from . import fake_sqlalchemy as sqlalchemy
@@ -817,7 +817,7 @@ def parse_dbstring(dbstring):
     url = make_url(dbstring)
     if 'table' not in url.query:
         # support legacy syntax for postgres
-        if url.drivername == 'postgres':
+        if url.drivername in ('postgres', 'postgresql'):
             db = url.database.split('/')
             if len(db) == 2:
                 url.database = db[0]
@@ -840,25 +840,19 @@ def open_db(dbstr, echo=False, serial=False, poolclass=sqlalchemy.pool.NullPool,
     """
     url = parse_dbstring(dbstr)
 
-    tablename = url.query.pop('table')
-    dbname = url.query.pop('dbname', None)
+    query = dict(url.query)
+    tablename = query.pop('table')
+    dbname = query.pop('dbname', None)
     if dbname is None:
         dbname = url.database
 
+    # mutate url
+    url = url._asdict()
+    url['query'] = query
+    url = URL.create(**url)
+
     if serial:
-        if sqlalchemy.__version__ >= '0.6':
-            engine = create_engine(url, echo=echo, poolclass=poolclass, isolation_level='SERIALIZABLE')
-        else:
-            import psycopg2.extensions
-
-            def connect():
-                c = psycopg2.connect(user=url.username, password=url.password,
-                                     database=url.database, host=url.host)  # , port=url.port)
-                c.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE)
-                return c
-            engine = create_engine('postgres://', creator=connect, poolclass=poolclass
-                                   )
-
+        engine = create_engine(url, echo=echo, poolclass=poolclass, isolation_level='SERIALIZABLE')
     else:
         engine = create_engine(url, echo=echo, poolclass=poolclass)
 
