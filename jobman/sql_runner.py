@@ -14,6 +14,7 @@ import random
 import re
 import signal
 import multiprocessing as mp
+import sqlalchemy
 from contextlib import (
     contextmanager, redirect_stdout as ctx_redirect_stdout, redirect_stderr as ctx_redirect_stderr, ExitStack
 )
@@ -170,28 +171,38 @@ class DBRSyncChannel(RSyncChannel):
         print("Selected job id=%d in table=%s in db=%s" % (
             self.dbstate.id, self.db.tablename, self.db.dbname))
 
-        try:
-            state = expand(self.dbstate)
-            # The id isn't set by the line above
-            state["jobman.id"] = self.dbstate.id
-            if "dbdict" in state:
-                state.jobman = state.dbdict
-            experiment = state.jobman.experiment
-            if module_path:
-                experiment = '{}.{}'.format(module_path, experiment)
+        while True:
+            try:
+                state = expand(self.dbstate)
+                # The id isn't set by the line above
+                state["jobman.id"] = self.dbstate.id
+                if "dbdict" in state:
+                    state.jobman = state.dbdict
+                experiment = state.jobman.experiment
+                if module_path:
+                    experiment = '{}.{}'.format(module_path, experiment)
 
-            experiment = resolve(experiment)
-            remote_path = os.path.join(remote_root, self.db.dbname,
-                                       self.db.tablename, str(self.dbstate.id))
-            super(DBRSyncChannel, self).__init__(path, remote_path,
-                                                 experiment, state,
-                                                 redirect_stdout,
-                                                 redirect_stderr,
-                                                 finish_up_after,
-                                                 save_interval)
-        except:
-            self.dbstate['jobman.status'] = self.ERR_START
-            raise
+                experiment = resolve(experiment)
+                remote_path = os.path.join(remote_root, self.db.dbname,
+                                           self.db.tablename, str(self.dbstate.id))
+                super(DBRSyncChannel, self).__init__(path, remote_path,
+                                                     experiment, state,
+                                                     redirect_stdout,
+                                                     redirect_stderr,
+                                                     finish_up_after,
+                                                     save_interval)
+            except sqlalchemy.exc.OperationalError as ex:
+                if 'SerializationFailure' in str(ex):
+                    time.sleep(2.)
+                    continue
+
+                self.dbstate['jobman.status'] = self.ERR_START
+                raise
+            except Exception:
+                self.dbstate['jobman.status'] = self.ERR_START
+                raise
+            else:
+                break
 
     def save(self, num_retries=3):
         # If the DB is not writable, the rsync won't happen
